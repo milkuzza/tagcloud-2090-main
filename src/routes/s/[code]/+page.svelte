@@ -247,12 +247,12 @@
 
 {#if survey.status === 'sent'}
   <div class="alert alert-success">
-    Опрос завершён. Письмо с результатами отправлено на <strong>{survey.creatorEmail}</strong>.
+    Опрос завершён. Письмо с результатами отправлено на <b>{survey.creatorEmail}</b>.
   </div>
 {:else if survey.status === 'failed'}
   <div class="alert alert-warn">
     <div class="alert-text">
-      Опрос завершён, но <strong>письмо не дошло</strong>. Можно скачать CSV ниже или повторить
+      Опрос завершён, но <b>письмо не дошло</b>. Можно скачать CSV ниже или повторить
       отправку.
     </div>
     <div class="alert-actions">
@@ -291,7 +291,7 @@
       <div class="share-block">
         <h2 class="share-h">Ссылка на опрос</h2>
         <div class="link-row">
-          <code>{respondentUrl}</code>
+          <span>{respondentUrl}</span>
           <button class="btn btn-ghost btn-sm" onclick={copyLink}>
             {copyDoneLink ? 'Скопировано' : 'Копировать'}
           </button>

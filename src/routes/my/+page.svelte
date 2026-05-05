@@ -96,7 +96,6 @@
 {#if data.surveys.length === 0}
   <div class="empty">
     <p>У вас пока нет опросов.</p>
-    <a class="btn btn-primary btn-lg" href="/new">Создать опрос</a>
   </div>
 {:else}
   <ul class="list">

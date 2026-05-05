@@ -1,20 +1,3 @@
--- Baseline-схема для свежей установки tagcloud-2090.
---
--- Раньше история была разрезана на 6 файлов (0000–0005) — это было нужно,
--- пока проект ехал по нескольким окружениям и нельзя было трогать уже
--- применённое. Так как продакшна ещё не было, сводим всё в одну миграцию,
--- которая создаёт схему "с нуля" в финальном виде.
---
--- В прежней истории шли:
---   0000 — базовые таблицы surveys/questions/responses + enum'ы;
---   0001 — surveys.creator_token (UUID, UNIQUE) для legacy ?t= доступа;
---   0002 — таблицы users/sessions, surveys.user_id (FK), backfill по email;
---   0003 — users.email_verified/email_verified_at + email_verification_tokens;
---   0004 — questions.max_answers integer (default 20) + CHECK 1..50;
---   0005 — расширение CHECK до 1..200.
--- Backfill из 0002/0003 на чистой БД no-op, так что в baseline его нет.
-
--- ENUM-типы
 CREATE TYPE "public"."answer_type" AS ENUM('single', 'multi');--> statement-breakpoint
 CREATE TYPE "public"."color_scheme" AS ENUM('mono', 'random', 'custom');--> statement-breakpoint
 CREATE TYPE "public"."survey_status" AS ENUM('active', 'expired', 'sent', 'failed');--> statement-breakpoint

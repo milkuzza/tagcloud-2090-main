@@ -136,7 +136,6 @@
   </div>
 {:else}
   <h1>{survey.title ?? 'Опрос'}</h1>
-  <p class="muted">Анонимно. Без регистрации.</p>
 
   <form
     onsubmit={(e) => {

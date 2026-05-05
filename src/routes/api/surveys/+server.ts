@@ -8,7 +8,7 @@ import type { RequestHandler } from './$types';
 export const POST: RequestHandler = async ({ request, url, locals }) => {
   if (!locals.user) {
     return json(
-      { error: { code: 'unauthorized', message: 'Войди, чтобы создать опрос' } },
+      { error: { code: 'unauthorized', message: 'Войдите, чтобы создать опрос' } },
       { status: 401 }
     );
   }
