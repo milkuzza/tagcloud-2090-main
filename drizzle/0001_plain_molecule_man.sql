@@ -1,2 +1,0 @@
-ALTER TABLE "surveys" ADD COLUMN "creator_token" uuid DEFAULT gen_random_uuid() NOT NULL;--> statement-breakpoint
-ALTER TABLE "surveys" ADD CONSTRAINT "surveys_creator_token_unique" UNIQUE("creator_token");
