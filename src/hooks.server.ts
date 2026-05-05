@@ -44,6 +44,15 @@ export const handle: Handle = async ({ event, resolve }) => {
     async () => {
       const response = await resolve(event);
       response.headers.set('x-request-id', requestId);
+      // Запрещаем кешировать любые ответы JSON-API: они персонализированы
+      // (cookie/session/IP), и попадание в shared-cache (proxy, CDN, edge)
+      // может вернуть чужие данные. Не трогаем GET .csv (там уже выставлен
+      // no-store вручную) и SSR-страницы — там SvelteKit сам управляет.
+      if (event.url.pathname.startsWith('/api/')) {
+        if (!response.headers.has('Cache-Control')) {
+          response.headers.set('Cache-Control', 'no-store');
+        }
+      }
       const duration = performance.now() - start;
       // Не зашумляем лог запросами health-проб — их Caddy дёргает раз в секунду.
       if (event.url.pathname !== '/healthz' && event.url.pathname !== '/readyz') {

@@ -8,9 +8,7 @@
 
 <section class="hero">
   <h1>Облако тегов</h1>
-  <p class="lead">
-    Анонимные опросы для школьных мероприятий.
-  </p>
+  <p class="lead">Анонимные опросы для школьных мероприятий.</p>
 
   <div class="cta-row">
     <a class="btn btn-primary btn-lg" href="/join">Пройти опрос</a>

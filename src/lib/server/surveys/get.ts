@@ -1,4 +1,4 @@
-import { eq, desc, sql, inArray } from 'drizzle-orm';
+import { eq, desc, sql, inArray, asc } from 'drizzle-orm';
 import { db } from '../db';
 import { surveys, questions, responses } from '../schema';
 
@@ -28,31 +28,48 @@ export type SurveyForCreator = SurveyPublic & {
   createdAt: Date;
 };
 
-async function loadQuestions(surveyId: string): Promise<QuestionPublic[]> {
+/**
+ * Грузит опрос вместе с вопросами одним SQL-запросом (LEFT JOIN). Раньше
+ * было два round-trip: `select surveys`, потом `select questions`. Один JOIN
+ * сокращает задержку SSR-загрузки ~на половину RTT до Postgres.
+ */
+async function loadSurveyWithQuestions(
+  code: string
+): Promise<{ survey: typeof surveys.$inferSelect; questions: QuestionPublic[] } | null> {
   const rows = await db
-    .select()
-    .from(questions)
-    .where(eq(questions.surveyId, surveyId))
-    .orderBy(questions.position);
-  return rows.map((q) => ({
-    id: q.id,
-    text: q.text,
-    answerType: q.answerType,
-    maxAnswers: q.maxAnswers,
-    position: q.position
-  }));
+    .select({ survey: surveys, question: questions })
+    .from(surveys)
+    .leftJoin(questions, eq(questions.surveyId, surveys.id))
+    .where(eq(surveys.code, code))
+    .orderBy(asc(questions.position));
+
+  if (rows.length === 0) return null;
+  const survey = rows[0].survey;
+  const qs: QuestionPublic[] = [];
+  for (const row of rows) {
+    const q = row.question;
+    if (!q) continue; // LEFT JOIN: возможен null если вопросов нет
+    qs.push({
+      id: q.id,
+      text: q.text,
+      answerType: q.answerType,
+      maxAnswers: q.maxAnswers,
+      position: q.position
+    });
+  }
+  return { survey, questions: qs };
 }
 
 export async function getSurveyPublic(code: string): Promise<SurveyPublic | null> {
-  const [survey] = await db.select().from(surveys).where(eq(surveys.code, code)).limit(1);
-  if (!survey) return null;
-
+  const data = await loadSurveyWithQuestions(code);
+  if (!data) return null;
+  const { survey, questions: qs } = data;
   return {
     code: survey.code,
     title: survey.title,
     expiresAt: survey.expiresAt,
     status: survey.status,
-    questions: await loadQuestions(survey.id)
+    questions: qs
   };
 }
 
@@ -60,8 +77,9 @@ export async function getSurveyForCreator(
   code: string,
   opts: { userId?: string; token?: string }
 ): Promise<SurveyForCreator | null> {
-  const [survey] = await db.select().from(surveys).where(eq(surveys.code, code)).limit(1);
-  if (!survey) return null;
+  const data = await loadSurveyWithQuestions(code);
+  if (!data) return null;
+  const { survey, questions: qs } = data;
 
   // Доступ: либо session (userId матчит surveys.user_id), либо старый ?t=token
   const ok =
@@ -81,7 +99,7 @@ export async function getSurveyForCreator(
     colorScheme: survey.colorScheme,
     customPalette: survey.customPalette,
     createdAt: survey.createdAt,
-    questions: await loadQuestions(survey.id)
+    questions: qs
   };
 }
 

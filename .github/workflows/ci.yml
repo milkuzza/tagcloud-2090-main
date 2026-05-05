@@ -112,3 +112,19 @@ jobs:
         run: npx svelte-kit sync
       - name: Run vitest
         run: npm test
+
+  audit:
+    name: npm audit (high+ severity)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      # Падаем только на high/critical: low/moderate в транзитивных зависимостях
+      # обычно требуют отдельного триажа, не хочется блокировать каждый PR.
+      - name: npm audit --audit-level=high
+        run: npm audit --audit-level=high --omit=dev

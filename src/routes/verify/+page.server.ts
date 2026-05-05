@@ -28,7 +28,8 @@ export const load: PageServerLoad = async ({ url, cookies }) => {
     path: '/',
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    // Жёстко secure — см. login/+server.ts.
+    secure: true,
     expires: expiresAt
   });
 

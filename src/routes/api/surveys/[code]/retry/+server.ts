@@ -4,8 +4,18 @@ import { db } from '$lib/server/db';
 import { surveys } from '$lib/server/schema';
 import { processExpired } from '$lib/server/expiry/process';
 import { requireCreatorAccess } from '$lib/server/auth/access';
+import { log, withLogContext } from '$lib/server/log';
 import type { RequestHandler } from './$types';
 
+/**
+ * Повторная попытка обработки/отправки результатов.
+ *
+ * Помечаем опрос как `expired` (если был `failed`) и запускаем обработку
+ * в фоне через `setImmediate`. HTTP отвечает 202 сразу — UI снимает
+ * крутилку «Отправляем…» и подписывается на статус через WS / опрос
+ * страницы. Если фон упадёт — cron подберёт как stuck-expired через
+ * STUCK_EXPIRED_THRESHOLD_MS.
+ */
 export const POST: RequestHandler = async ({ params, url, locals }) => {
   const access = await requireCreatorAccess({
     code: params.code!,
@@ -20,7 +30,7 @@ export const POST: RequestHandler = async ({ params, url, locals }) => {
   }
   const survey = access.survey;
 
-  // Можно retry только если опрос завершён неудачно или застрял в обработке
+  // Можно retry только если опрос завершён неудачно или застрял в обработке.
   const [claimed] = await db
     .update(surveys)
     .set({ status: 'expired' })
@@ -40,13 +50,15 @@ export const POST: RequestHandler = async ({ params, url, locals }) => {
     );
   }
 
-  await processExpired(claimed);
+  setImmediate(() => {
+    void withLogContext({ surveyCode: claimed.code, surveyId: claimed.id }, () =>
+      processExpired(claimed).catch((err) => {
+        log.error('retry_background_process_failed', {
+          err: err instanceof Error ? err.message : String(err)
+        });
+      })
+    );
+  });
 
-  const [final] = await db
-    .select({ status: surveys.status })
-    .from(surveys)
-    .where(eq(surveys.id, survey.id))
-    .limit(1);
-
-  return json({ ok: true, status: final.status });
+  return json({ ok: true, status: 'expired' as const }, { status: 202 });
 };

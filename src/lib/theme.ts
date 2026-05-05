@@ -11,8 +11,3 @@ export const palette = {
 } as const;
 
 export type PaletteColor = keyof typeof palette;
-
-export const cloudPresets = {
-  mono: [palette.navy],
-  brand: [palette.navy, palette.blue, palette.gold]
-} as const;

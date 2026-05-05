@@ -1,29 +1,13 @@
 import { env } from '$env/dynamic/private';
 import { getTransporter } from './smtp';
 import { getLogoPng } from './logo';
+import { escapeHtml } from './escape';
 
 const NAVY = '#0E2A5C';
 const MUTED = '#6B7280';
 const TEXT = '#1A1A1A';
 const BORDER = '#E5E7EB';
 const SURFACE = '#F7F8FA';
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (ch) => {
-    switch (ch) {
-      case '&':
-        return '&amp;';
-      case '<':
-        return '&lt;';
-      case '>':
-        return '&gt;';
-      case '"':
-        return '&quot;';
-      default:
-        return '&#39;';
-    }
-  });
-}
 
 export type VerificationEmailInput = {
   to: string;

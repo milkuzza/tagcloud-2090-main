@@ -4,8 +4,19 @@ import { db } from '$lib/server/db';
 import { surveys } from '$lib/server/schema';
 import { processExpired } from '$lib/server/expiry/process';
 import { requireCreatorAccess } from '$lib/server/auth/access';
+import { log, withLogContext } from '$lib/server/log';
 import type { RequestHandler } from './$types';
 
+/**
+ * Завершает голосование. Атомарный переход active → expired, после этого
+ * ставим обработку (рендер PNG + CSV + SMTP) на фон через `setImmediate`,
+ * а клиенту сразу возвращаем 202.
+ *
+ * Раньше тут был `await processExpired`: HTTP висел до завершения SMTP
+ * (десятки секунд при медленном провайдере), один HTTP-воркер был занят
+ * всё это время. Если фоновая задача упадёт — cron подберёт опрос как
+ * stuck-expired (см. STUCK_EXPIRED_THRESHOLD_MS) и повторит попытку.
+ */
 export const POST: RequestHandler = async ({ params, url, locals }) => {
   const access = await requireCreatorAccess({
     code: params.code!,
@@ -40,15 +51,17 @@ export const POST: RequestHandler = async ({ params, url, locals }) => {
     );
   }
 
-  // Синхронно обрабатываем: aggregate → PNG → CSV → sendMail.
-  // processExpired выставит status='sent' или 'failed' и broadcast notifyClosed.
-  await processExpired(claimed);
+  // Запускаем обработку в фоне. Ошибки логируем — статус будет 'failed',
+  // дашборд автоматически предложит retry.
+  setImmediate(() => {
+    void withLogContext({ surveyCode: claimed.code, surveyId: claimed.id }, () =>
+      processExpired(claimed).catch((err) => {
+        log.error('finish_background_process_failed', {
+          err: err instanceof Error ? err.message : String(err)
+        });
+      })
+    );
+  });
 
-  const [final] = await db
-    .select({ status: surveys.status })
-    .from(surveys)
-    .where(eq(surveys.id, survey.id))
-    .limit(1);
-
-  return json({ ok: true, status: final.status });
+  return json({ ok: true, status: 'expired' as const }, { status: 202 });
 };
