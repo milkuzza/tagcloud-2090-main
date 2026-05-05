@@ -290,7 +290,7 @@
       <div class="share-block">
         <h2 class="share-h">Ссылка на опрос</h2>
         <div class="link-row">
-          <span>{respondentUrl}</span>
+          <span class="link-text">{respondentUrl}</span>
           <button class="btn btn-ghost btn-sm" onclick={copyLink}>
             {copyDoneLink ? 'Скопировано' : 'Копировать'}
           </button>
@@ -464,14 +464,16 @@
     gap: var(--space-2);
     flex-wrap: wrap;
   }
-  .link-row code {
+  .link-row .link-text {
     flex: 1;
     min-width: 200px;
     padding: var(--space-2) var(--space-3);
     background: var(--c-bg);
     border: 1px solid var(--c-border);
     border-radius: var(--radius);
+    font-family: var(--font-mono);
     font-size: 0.875rem;
+    color: var(--c-text);
     word-break: break-all;
   }
   .qr {
