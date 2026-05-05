@@ -134,7 +134,11 @@
     );
     pointer-events: none;
   }
+  /* Каждая вариация задаёт свою итоговую прозрачность через --target-opacity,
+     потому что animation-fill-mode: forwards закрепляет финальное значение
+     keyframe в каскаде с приоритетом выше обычных стилей. */
   .tag {
+    --target-opacity: 1;
     font-weight: 600;
     line-height: 1;
     font-size: calc(0.9rem * var(--s));
@@ -149,7 +153,7 @@
   }
   .tag-muted {
     color: var(--c-text);
-    opacity: 0.7;
+    --target-opacity: 0.7;
   }
   .tag-subtle {
     color: var(--c-subtle);
@@ -160,7 +164,7 @@
       transform: translateY(6px);
     }
     to {
-      opacity: 1;
+      opacity: var(--target-opacity);
       transform: translateY(0);
     }
   }
@@ -169,12 +173,7 @@
     .tag {
       animation: none;
       transform: none;
-    }
-    .tag {
-      opacity: 1;
-    }
-    .tag-muted {
-      opacity: 0.7;
+      opacity: var(--target-opacity);
     }
   }
 
