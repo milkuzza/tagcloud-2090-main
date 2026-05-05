@@ -527,9 +527,9 @@
     color: var(--c-text);
   }
   .tab.active {
-    background: var(--c-navy);
-    color: white;
-    border-color: var(--c-navy);
+    background: var(--c-primary-bg);
+    color: var(--c-primary-fg);
+    border-color: var(--c-primary-bg);
   }
   .active-question {
     font-weight: 500;

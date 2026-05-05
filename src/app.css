@@ -6,6 +6,13 @@
   --c-blue: #2d9fda;
   --c-gold: #e0b73a;
 
+  /* Primary-поверхность (фон кнопок/табов) и её текст.
+     Отделено от --c-navy, потому что в dark mode navy
+     становится светлым акцентом и не годится как фон под белый текст. */
+  --c-primary-bg: var(--c-navy);
+  --c-primary-bg-hover: var(--c-navy-hover);
+  --c-primary-fg: #ffffff;
+
   /* Нейтральная шкала (тёплый off-white, мягкий контраст) */
   --c-bg: #fcfcfd;
   --c-surface: #f4f4f5;
@@ -74,6 +81,11 @@
     --c-navy: #6ea6ff;
     --c-navy-hover: #8db8ff;
 
+    /* Тёмный текст на светло-синей primary-поверхности — контраст ~9:1. */
+    --c-primary-bg: #6ea6ff;
+    --c-primary-bg-hover: #8db8ff;
+    --c-primary-fg: #0b0f19;
+
     --c-danger: #f87171;
     --c-danger-bg: rgba(248, 113, 113, 0.08);
     --c-danger-border: rgba(248, 113, 113, 0.25);
@@ -116,7 +128,7 @@ body {
 
 ::selection {
   background: var(--c-navy);
-  color: #fff;
+  color: var(--c-bg);
 }
 
 a {
@@ -230,15 +242,15 @@ a:focus-visible {
 }
 
 .btn-primary {
-  background: var(--c-navy);
-  color: #fff;
-  border-color: var(--c-navy);
+  background: var(--c-primary-bg);
+  color: var(--c-primary-fg);
+  border-color: var(--c-primary-bg);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--c-navy-hover);
-  border-color: var(--c-navy-hover);
-  color: #fff;
+  background: var(--c-primary-bg-hover);
+  border-color: var(--c-primary-bg-hover);
+  color: var(--c-primary-fg);
 }
 
 .btn-ghost {
