@@ -305,10 +305,10 @@
     gap: var(--space-2);
   }
   fieldset {
-    border: 0;
-    padding: var(--space-4);
+    border: 1px solid var(--c-border);
+    padding: var(--space-6);
     margin: 0;
-    background: var(--c-surface);
+    background: var(--c-bg);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
     display: flex;
@@ -317,9 +317,10 @@
   }
   legend {
     font-weight: 600;
-    color: var(--c-navy);
+    color: var(--c-text);
     padding: 0;
     margin-bottom: var(--space-2);
+    letter-spacing: -0.01em;
   }
   label > span {
     font-weight: 500;
@@ -334,37 +335,37 @@
   .segmented {
     display: inline-flex;
     flex-wrap: wrap;
-    gap: 4px;
-    background: var(--c-bg);
+    gap: 2px;
+    background: var(--c-surface);
     border: 1px solid var(--c-border);
     border-radius: var(--radius);
-    padding: 4px;
+    padding: 3px;
   }
   .seg {
     flex: 1;
     min-width: 0;
-    padding: 8px 14px;
+    padding: 7px 14px;
     background: transparent;
     border: 0;
-    border-radius: 6px;
+    border-radius: calc(var(--radius) - 4px);
     color: var(--c-muted);
     font: 500 0.875rem/1.2 inherit;
     cursor: pointer;
     white-space: nowrap;
     transition:
-      background-color 120ms,
-      color 120ms;
+      background-color var(--transition),
+      color var(--transition);
   }
   .seg:hover:not(.active) {
-    background: var(--c-surface);
     color: var(--c-text);
   }
   .seg.active {
-    background: var(--c-navy);
-    color: #fff;
+    background: var(--c-bg);
+    color: var(--c-text);
+    box-shadow: var(--shadow-sm);
   }
   .seg-sm {
-    padding: 6px 12px;
+    padding: 5px 12px;
     font-size: 0.8125rem;
   }
 
@@ -402,10 +403,10 @@
 
   /* ─── Вопросы ──────────────────────── */
   .question {
-    background: var(--c-bg);
+    background: var(--c-surface);
     border: 1px solid var(--c-border);
     border-radius: var(--radius);
-    padding: var(--space-3);
+    padding: var(--space-4);
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
@@ -493,7 +494,7 @@
 
   /* ─── Дополнительно ──────────────────────── */
   .advanced {
-    background: var(--c-surface);
+    border: 1px solid var(--c-border);
     border-radius: var(--radius);
     padding: var(--space-3) var(--space-4);
   }

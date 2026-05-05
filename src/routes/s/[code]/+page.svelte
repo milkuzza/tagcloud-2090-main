@@ -252,8 +252,7 @@
 {:else if survey.status === 'failed'}
   <div class="alert alert-warn">
     <div class="alert-text">
-      Опрос завершён, но <b>письмо не дошло</b>. Можно скачать CSV ниже или повторить
-      отправку.
+      Опрос завершён, но <b>письмо не дошло</b>. Можно скачать CSV ниже или повторить отправку.
     </div>
     <div class="alert-actions">
       <button class="btn btn-primary btn-sm" onclick={retrySend} disabled={retrying}>

@@ -1,33 +1,47 @@
+/* ─── Минималистичная дизайн-система ──────────────────────────────────── */
 :root {
+  /* Бренд */
   --c-navy: #0e2a5c;
   --c-navy-hover: #0a1f47;
   --c-blue: #2d9fda;
   --c-gold: #e0b73a;
-  --c-bg: #ffffff;
-  --c-surface: #f7f8fa;
-  --c-surface-hover: #eef0f4;
-  --c-text: #1a1a1a;
-  --c-muted: #6b7280;
-  --c-border: #e5e7eb;
+
+  /* Нейтральная шкала (тёплый off-white, мягкий контраст) */
+  --c-bg: #fcfcfd;
+  --c-surface: #f4f4f5;
+  --c-surface-hover: #ececef;
+  --c-text: #0b0f19;
+  --c-muted: #5b6472;
+  --c-subtle: #8a8f99;
+  --c-border: #ececef;
+  --c-border-strong: #d8d9de;
+
+  /* Состояния */
   --c-danger: #dc2626;
   --c-danger-bg: #fef2f2;
   --c-danger-border: #fecaca;
   --c-success: #16a34a;
-  --c-success-bg: #dcfce7;
+  --c-success-bg: #f0fdf4;
   --c-success-fg: #166534;
+  --c-success-border: #bbf7d0;
   --c-warn: #d97706;
   --c-warn-bg: #fffbeb;
   --c-warn-border: #fde68a;
   --c-warn-fg: #92400e;
-  --c-focus: rgba(45, 159, 218, 0.4);
+  --c-focus: rgba(45, 159, 218, 0.35);
 
+  /* Типографика */
   --font-sans:
-    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    sans-serif;
-  --font-mono: 'SF Mono', Menlo, monospace;
+    'Inter', 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Menlo', ui-monospace, monospace;
 
-  --radius: 8px;
-  --radius-lg: 12px;
+  /* Радиусы и отступы */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -35,9 +49,48 @@
   --space-6: 24px;
   --space-8: 32px;
   --space-12: 48px;
+  --space-16: 64px;
 
-  --shadow-sm: 0 1px 2px rgba(14, 42, 92, 0.06);
-  --shadow: 0 4px 12px rgba(14, 42, 92, 0.08);
+  /* Тонкие тени */
+  --shadow-sm: 0 1px 2px rgba(11, 15, 25, 0.04);
+  --shadow: 0 4px 16px rgba(11, 15, 25, 0.06);
+  --shadow-lg: 0 12px 32px rgba(11, 15, 25, 0.08);
+
+  --header-h: 64px;
+  --transition: 160ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-bg: #0c0d10;
+    --c-surface: #15171c;
+    --c-surface-hover: #1d1f25;
+    --c-text: #f3f4f6;
+    --c-muted: #9aa0ab;
+    --c-subtle: #6b7280;
+    --c-border: #232631;
+    --c-border-strong: #2c303b;
+
+    --c-navy: #6ea6ff;
+    --c-navy-hover: #8db8ff;
+
+    --c-danger: #f87171;
+    --c-danger-bg: rgba(248, 113, 113, 0.08);
+    --c-danger-border: rgba(248, 113, 113, 0.25);
+    --c-success: #4ade80;
+    --c-success-bg: rgba(74, 222, 128, 0.08);
+    --c-success-fg: #86efac;
+    --c-success-border: rgba(74, 222, 128, 0.25);
+    --c-warn: #fbbf24;
+    --c-warn-bg: rgba(251, 191, 36, 0.08);
+    --c-warn-border: rgba(251, 191, 36, 0.25);
+    --c-warn-fg: #fcd34d;
+    --c-focus: rgba(110, 166, 255, 0.45);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+  }
 }
 
 *,
@@ -54,26 +107,53 @@ body {
   color: var(--c-text);
   font-family: var(--font-sans);
   font-size: 16px;
-  line-height: 1.5;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+::selection {
+  background: var(--c-navy);
+  color: #fff;
 }
 
 a {
-  color: var(--c-navy);
+  color: var(--c-text);
   text-decoration: none;
+  transition: color var(--transition);
 }
 
 a:hover {
-  text-decoration: underline;
+  color: var(--c-navy);
 }
 
 h1,
 h2,
-h3 {
+h3,
+h4 {
   margin: 0 0 var(--space-4);
-  color: var(--c-navy);
+  color: var(--c-text);
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+h1 {
+  font-size: clamp(1.75rem, 1.4rem + 1.6vw, 2.5rem);
+}
+
+h2 {
+  font-size: 1.375rem;
+}
+
+h3 {
+  font-size: 1.125rem;
+}
+
+p {
+  margin: 0 0 var(--space-4);
 }
 
 button {
@@ -85,16 +165,25 @@ code {
   font-family: var(--font-mono);
   background: var(--c-surface);
   padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.9em;
+  border-radius: var(--radius-sm);
+  font-size: 0.875em;
   word-break: break-all;
+  color: var(--c-text);
 }
 
-/* единое focus-кольцо для интерактивных элементов */
+hr {
+  border: 0;
+  border-top: 1px solid var(--c-border);
+  margin: var(--space-6) 0;
+}
+
+/* Единое focus-кольцо */
 :focus-visible {
   outline: 2px solid var(--c-blue);
   outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
+
 button:focus-visible,
 .btn:focus-visible,
 a:focus-visible {
@@ -102,7 +191,7 @@ a:focus-visible {
   border-radius: var(--radius);
 }
 
-/* ─── Базовые кнопки ─────────────────────────────────────────────────────── */
+/* ─── Кнопки ─────────────────────────────────────────────────────────────── */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -112,23 +201,31 @@ a:focus-visible {
   font-size: 0.9375rem;
   font-weight: 500;
   line-height: 1.2;
-  padding: 10px 16px;
+  padding: 10px 18px;
   border-radius: var(--radius);
   border: 1px solid transparent;
   background: transparent;
+  color: var(--c-text);
   cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
   transition:
-    background-color 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease;
+    background-color var(--transition),
+    border-color var(--transition),
+    color var(--transition),
+    transform var(--transition);
 }
+
 .btn:hover {
   text-decoration: none;
 }
+
+.btn:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -137,6 +234,7 @@ a:focus-visible {
   color: #fff;
   border-color: var(--c-navy);
 }
+
 .btn-primary:hover:not(:disabled) {
   background: var(--c-navy-hover);
   border-color: var(--c-navy-hover);
@@ -145,32 +243,40 @@ a:focus-visible {
 
 .btn-ghost {
   background: transparent;
-  color: var(--c-navy);
+  color: var(--c-text);
   border-color: var(--c-border);
 }
+
 .btn-ghost:hover:not(:disabled) {
   background: var(--c-surface);
-  color: var(--c-navy);
+  border-color: var(--c-border-strong);
+  color: var(--c-text);
 }
 
 .btn-danger {
   background: transparent;
   color: var(--c-danger);
-  border-color: var(--c-danger);
+  border-color: var(--c-danger-border);
 }
+
 .btn-danger:hover:not(:disabled) {
   background: var(--c-danger-bg);
+  border-color: var(--c-danger);
   color: var(--c-danger);
 }
 
 .btn-sm {
   padding: 6px 12px;
   font-size: 0.8125rem;
+  border-radius: var(--radius-sm);
 }
+
 .btn-lg {
   padding: 14px 24px;
   font-size: 1rem;
+  border-radius: var(--radius);
 }
+
 .btn-block {
   width: 100%;
 }
@@ -179,22 +285,36 @@ a:focus-visible {
 .input {
   font-family: inherit;
   font-size: 1rem;
-  padding: var(--space-3);
-  border: 1px solid var(--c-border);
+  padding: 11px 14px;
+  border: 1px solid var(--c-border-strong);
   border-radius: var(--radius);
   background: var(--c-bg);
   color: var(--c-text);
   width: 100%;
-  /* предотвращает auto-zoom на iOS Safari (font-size <16px вызывает zoom) */
+  line-height: 1.4;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
   -webkit-appearance: none;
   appearance: none;
 }
+
+.input::placeholder {
+  color: var(--c-subtle);
+}
+
+.input:hover:not(:focus) {
+  border-color: var(--c-subtle);
+}
+
 .input:focus {
   border-color: var(--c-blue);
   outline: none;
   box-shadow: 0 0 0 3px var(--c-focus);
 }
+
 @supports (-webkit-touch-callout: none) {
+  /* Предотвращаем auto-zoom на iOS Safari */
   .input {
     font-size: 16px;
   }
@@ -202,46 +322,58 @@ a:focus-visible {
 
 /* ─── Карточки ───────────────────────────────────────────────────────────── */
 .card {
-  background: var(--c-surface);
+  background: var(--c-bg);
   padding: var(--space-6);
   border-radius: var(--radius-lg);
+  border: 1px solid var(--c-border);
   box-shadow: var(--shadow-sm);
 }
 
-/* ─── Бейджи статусов ────────────────────────────────────────────────────── */
+.card-surface {
+  background: var(--c-surface);
+  border-color: transparent;
+}
+
+/* ─── Бейджи статусов (минималистичные капсулы с dot) ───────────────────── */
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 500;
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
+  background: var(--c-bg);
+  border: 1px solid var(--c-border-strong);
+  color: var(--c-muted);
   white-space: nowrap;
+  letter-spacing: 0.01em;
 }
+
 .badge::before {
   content: '';
   display: block;
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: currentColor;
+  flex-shrink: 0;
 }
+
 .badge-active {
-  background: #dbeafe;
-  color: #1e3a8a;
+  color: var(--c-blue);
 }
+
 .badge-success {
-  background: var(--c-success-bg);
-  color: var(--c-success-fg);
+  color: var(--c-success);
 }
+
 .badge-danger {
-  background: var(--c-danger-bg);
-  color: #991b1b;
+  color: var(--c-danger);
 }
+
 .badge-muted {
-  background: #f3f4f6;
-  color: #4b5563;
+  color: var(--c-subtle);
 }
 
 /* ─── Mobile ─────────────────────────────────────────────────────────────── */
@@ -249,8 +381,5 @@ a:focus-visible {
   html,
   body {
     font-size: 15px;
-  }
-  h1 {
-    font-size: 1.5rem;
   }
 }

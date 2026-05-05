@@ -52,8 +52,8 @@
   {#if pending}
     <h1>Письмо отправлено</h1>
     <p>
-      Мы отправили ссылку для подтверждения на <b>{pending.email}</b>. Откройте письмо и
-      нажмите кнопку, чтобы войти.
+      Мы отправили ссылку для подтверждения на <b>{pending.email}</b>. Откройте письмо и нажмите
+      кнопку, чтобы войти.
     </p>
     <p class="muted">
       Ссылка действует {pending.ttlHours} ч. Не пришло — проверьте «Спам» или нажмите ниже.
@@ -133,9 +133,10 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    background: var(--c-surface);
+    background: var(--c-bg);
     padding: var(--space-6);
     border-radius: var(--radius-lg);
+    border: 1px solid var(--c-border);
     box-shadow: var(--shadow-sm);
     margin-top: var(--space-6);
   }

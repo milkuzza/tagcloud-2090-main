@@ -125,9 +125,10 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    background: var(--c-surface);
+    background: var(--c-bg);
     padding: var(--space-6);
     border-radius: var(--radius-lg);
+    border: 1px solid var(--c-border);
     box-shadow: var(--shadow-sm);
   }
   label {
