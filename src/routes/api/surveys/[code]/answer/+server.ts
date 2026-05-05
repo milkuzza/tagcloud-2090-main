@@ -62,8 +62,21 @@ export const POST: RequestHandler = async ({ params, request, getClientAddress }
     return json({ error: v.error }, { status: statusForError(v.error.code) });
   }
 
-  await submitAnswers(v.processed);
+  const submit = await submitAnswers(v.processed);
+  if (!submit.ok) {
+    // Buffer переполнен — БД/Redis в недоступности, дренаж не успевает.
+    // Не markVoted: клиент должен ретрайнуть позже, голос ещё не принят.
+    return json(
+      {
+        error: {
+          code: 'overloaded',
+          message: 'Сервис временно перегружен, попробуйте через несколько секунд'
+        }
+      },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
   await markVoted(ip, code, v.survey.expiresAt);
 
-  return json({ ok: true, accepted: v.processed.length }, { status: 201 });
+  return json({ ok: true, accepted: submit.accepted }, { status: 201 });
 };

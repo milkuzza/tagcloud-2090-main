@@ -12,6 +12,13 @@ const AUTH_WINDOW_SEC = 15 * 60;
 const AUTH_IP_MAX = 30; // 30 попыток с одного IP за 15 минут
 const AUTH_EMAIL_MAX = 5; // 5 попыток на конкретный email за 15 минут
 
+// WebSocket upgrade — отдельный бакет: легитимный клиент открывает
+// 1 WS на дашборд, реконнект-петля 3с. 60 апгрейдов/мин с одного IP
+// многократный запас, защита от бот-перебора creatorToken через
+// массовые reconnect'ы.
+const WS_WINDOW_SEC = 60;
+const WS_MAX = 60;
+
 function todaySaltKey(): string {
   const d = new Date();
   return `salt:${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
@@ -89,4 +96,20 @@ export async function checkAuthRateLimit(ip: string, email: string): Promise<Rat
 async function emailHash(email: string): Promise<string> {
   const salt = await getOrCreateSalt();
   return createHash('sha256').update(`email:${email.trim().toLowerCase()}:${salt}`).digest('hex');
+}
+
+/**
+ * Лимит WebSocket-апгрейдов с одного IP. Защищает от bot-perebora
+ * creatorToken через массовые reconnect'ы. На WS-handshake обычный
+ * rate-limit не работает — там нет SvelteKit-обёртки.
+ */
+export async function checkWsRateLimit(ip: string): Promise<RateLimitResult> {
+  const key = `ws_rl:${await ipHash(ip)}`;
+  const cnt = await redis.incr(key);
+  if (cnt === 1) await redis.expire(key, WS_WINDOW_SEC);
+  if (cnt > WS_MAX) {
+    const ttl = await redis.ttl(key);
+    return { allowed: false, retryAfterSec: ttl > 0 ? ttl : WS_WINDOW_SEC };
+  }
+  return { allowed: true };
 }

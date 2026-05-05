@@ -18,15 +18,3 @@ export async function qrPngBase64(
     color: DEFAULTS.color
   });
 }
-
-export async function qrPngBuffer(
-  url: string,
-  opts: { size?: number; margin?: number } = {}
-): Promise<Buffer> {
-  return QRCode.toBuffer(url, {
-    width: opts.size ?? DEFAULTS.size,
-    margin: opts.margin ?? DEFAULTS.margin,
-    errorCorrectionLevel: DEFAULTS.errorCorrectionLevel,
-    color: DEFAULTS.color
-  });
-}

@@ -1,4 +1,5 @@
 import type { CloudWord } from '$lib/types/cloud';
+import { escapeHtml } from './escape';
 
 export type AggregatedQuestion = {
   question: { text: string; answerType: 'single' | 'multi' };
@@ -17,23 +18,6 @@ const MUTED = '#6B7280';
 const SURFACE = '#F7F8FA';
 const TEXT = '#1A1A1A';
 const BORDER = '#E5E7EB';
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (ch) => {
-    switch (ch) {
-      case '&':
-        return '&amp;';
-      case '<':
-        return '&lt;';
-      case '>':
-        return '&gt;';
-      case '"':
-        return '&quot;';
-      default:
-        return '&#39;';
-    }
-  });
-}
 
 export function resultsHtml(opts: ResultsTemplateInput): string {
   const items = opts.questions

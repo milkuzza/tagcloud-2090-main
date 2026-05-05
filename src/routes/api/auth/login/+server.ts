@@ -35,7 +35,10 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress 
     path: '/',
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    // Жёстко secure: приложение всегда живёт за TLS-прокси (Caddy в deploy/).
+    // На dev (http://localhost) современные браузеры допускают Secure-cookie
+    // на http для localhost — поэтому DX не страдает.
+    secure: true,
     expires: result.expiresAt
   });
 

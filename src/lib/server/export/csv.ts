@@ -4,8 +4,6 @@ import { questions } from '../schema';
 import { aggregateQuestion } from '../cloud/aggregate';
 import { CSV_BOM, csvEscape } from './csv-escape';
 
-export { csvEscape } from './csv-escape';
-
 export async function buildSurveyCsv(surveyId: string): Promise<string> {
   const qs = await db
     .select()

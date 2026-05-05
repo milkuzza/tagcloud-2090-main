@@ -63,14 +63,20 @@ export function genRequestId(): string {
   return randomUUID();
 }
 
-// Поля, которые маскируем в любом payload (защита от случайного
-// логирования секретов через extra).
-const REDACT_KEYS = new Set(['password', 'token', 'cookie', 'authorization']);
+// Маска по имени поля для защиты от случайного логирования секретов
+// через extra. Регэкс ловит:
+//   - password, secret, apikey/api_key, accesstoken/access_token, refreshtoken,
+//   - cookie, authorization,
+//   - sessionid/session_id, csrf_token,
+//   - creator_token, verify_token и т.п. суффиксы *token / *secret.
+// Match по lower-cased имени, разделители (_, -) игнорируются.
+const REDACT_RE =
+  /(password|passwd|secret|api[_-]?key|token|cookie|authorization|session[_-]?id|csrf|otp)/;
 
 function redact(obj: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(obj)) {
-    out[k] = REDACT_KEYS.has(k.toLowerCase()) ? '[REDACTED]' : v;
+    out[k] = REDACT_RE.test(k.toLowerCase()) ? '[REDACTED]' : v;
   }
   return out;
 }
