@@ -2,7 +2,7 @@
   import { onMount, onDestroy, untrack } from 'svelte';
   import type { PageProps } from './$types';
   import type { CloudWord, ServerMsg } from '$lib/types/cloud';
-  import { buildWordCloudOptions } from '$lib/cloud';
+  import { renderCloud } from '$lib/cloud-render';
 
   let { data }: PageProps = $props();
   const survey = $derived(data.survey);
@@ -117,21 +117,21 @@
       ctx!.fillRect(0, 0, canvas.width, canvas.height);
       return;
     }
-    let cancelled = false;
-    void (async () => {
-      const WordCloud = (await import('wordcloud')).default;
-      if (cancelled) return;
-      WordCloud(
-        canvas!,
-        buildWordCloudOptions(list, survey.colorScheme, survey.customPalette, {
-          baseSize: 20,
-          maxWords: survey.maxWords,
-          allowVertical: survey.allowVertical
-        })
-      );
-    })();
+    const token = { cancelled: false };
+    void renderCloud(
+      canvas,
+      list,
+      survey.colorScheme,
+      survey.customPalette,
+      {
+        baseSize: 20,
+        maxWords: survey.maxWords,
+        allowVertical: survey.allowVertical
+      },
+      token
+    );
     return () => {
-      cancelled = true;
+      token.cancelled = true;
     };
   });
 

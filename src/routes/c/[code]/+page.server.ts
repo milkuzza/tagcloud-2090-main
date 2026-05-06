@@ -20,9 +20,9 @@ export const load: PageServerLoad = async ({ params }) => {
   const survey = await getSurveyPublic(code);
   if (!survey) error(404, 'Опрос не найден');
 
-  // SSR-снэпшот облак для каждого вопроса. Дальше клиент периодически
-  // дозапрашивает /api/surveys/[code]/cloud для «живых» обновлений
-  // (если опрос ещё активен).
+  // SSR-снэпшот облак для каждого вопроса. Дальше клиент подключается
+  // к публичному WS `/ws/c/<code>`, где сервер бродкастит cloud:<qid>
+  // snapshots по pub/sub (без поллинга и без нагрузки на Postgres).
   const entries = await Promise.all(
     survey.questions.map(async (q) => [q.id, await aggregateQuestion(q.id, 200)] as const)
   );
