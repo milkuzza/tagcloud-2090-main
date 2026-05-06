@@ -52,7 +52,7 @@ SQL
 
 ```bash
 cd /opt/tagcloud
-sudo -u tagcloud git clone https://github.com/milkyzzantigravity1-bit/tagcloud-2090-main .
+sudo -u tagcloud git clone https://github.com/milkuzza/tagcloud-2090-main .
 sudo -u tagcloud npm ci
 sudo -u tagcloud npm run build
 sudo -u tagcloud DATABASE_URL=... npm run db:migrate
