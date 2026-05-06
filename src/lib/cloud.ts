@@ -200,7 +200,11 @@ export function buildWordCloudOptions(
     backgroundColor: opts.backgroundColor ?? '#FFFFFF',
     fontFamily: opts.fontFamily ?? "'Inter', sans-serif",
     rotateRatio: opts.allowVertical ? 0.4 : 0,
-    rotationSteps: 2,
+    // rotationSteps: 1 → wordcloud2.js даёт ровно 2 угла (-90° и +90°)
+    // 50/50. С rotationSteps: 2 он бы выдавал 3 угла (-90°, 0°, +90°),
+    // что съедает 50% «вертикалей» в нулевой угол и не совпадает с
+    // серверной отрисовкой в worker.
+    rotationSteps: 1,
     minRotation: -Math.PI / 2,
     maxRotation: Math.PI / 2,
     shrinkToFit: true,

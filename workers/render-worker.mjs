@@ -184,9 +184,16 @@ export default async function render(job) {
       )
       .padding(3)
       .random(rng)
-      // Если опрос разрешает вертикали — половина рандомных слов
-      // ставится под 90°, остальные горизонтально (аналогично сайту).
-      .rotate(() => (allowVertical && rng() < 0.4 ? 90 : 0))
+      // Если опрос разрешает вертикали — ~40% слов ставятся под ±90°
+      // (равновероятно влево/вправо), остальные — горизонтально.
+      // Логика 50/50 между −90° и +90° совпадает с настройками
+      // wordcloud2.js на фронте: rotateRatio=0.4, rotationSteps=1,
+      // minRotation=-π/2, maxRotation=π/2.
+      .rotate(() => {
+        if (!allowVertical) return 0;
+        if (rng() >= 0.4) return 0;
+        return rng() < 0.5 ? -90 : 90;
+      })
       .font(FONT)
       .fontSize((d) => d.size)
       .fontWeight((d) => String(d.weight))
