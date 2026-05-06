@@ -14,7 +14,7 @@ import { createCanvas } from 'canvas';
 import cloud from 'd3-cloud';
 
 const FONT = 'sans-serif';
-const BRAND_NAVY = '#0F172A';
+const BRAND_NAVY = '#0E2A5C';
 
 // Дублируем helper'ы из src/lib/cloud.ts — воркер обязан быть автономным,
 // иначе придётся тащить всё дерево SvelteKit'овских импортов в worker thread.

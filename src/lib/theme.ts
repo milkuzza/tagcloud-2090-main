@@ -9,5 +9,3 @@ export const palette = {
   border: '#E5E7EB',
   danger: '#DC2626'
 } as const;
-
-export type PaletteColor = keyof typeof palette;

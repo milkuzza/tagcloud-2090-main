@@ -252,8 +252,7 @@
 {:else if survey.status === 'failed'}
   <div class="alert alert-warn">
     <div class="alert-text">
-      Опрос завершён, но <b>письмо не дошло</b>. Можно скачать CSV ниже или повторить
-      отправку.
+      Опрос завершён, но <b>письмо не дошло</b>. Можно скачать CSV ниже или повторить отправку.
     </div>
     <div class="alert-actions">
       <button class="btn btn-primary btn-sm" onclick={retrySend} disabled={retrying}>
@@ -464,16 +463,6 @@
     align-items: center;
     gap: var(--space-2);
     flex-wrap: wrap;
-  }
-  .link-row code {
-    flex: 1;
-    min-width: 200px;
-    padding: var(--space-2) var(--space-3);
-    background: var(--c-bg);
-    border: 1px solid var(--c-border);
-    border-radius: var(--radius);
-    font-size: 0.875rem;
-    word-break: break-all;
   }
   .qr {
     width: 280px;
