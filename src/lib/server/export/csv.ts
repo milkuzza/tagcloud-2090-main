@@ -16,7 +16,10 @@ export async function buildSurveyCsv(surveyId: string): Promise<string> {
   // вопрос). Порядок сохраняем через индекс в map+await.
   const aggregates = await Promise.all(qs.map((q) => aggregateQuestion(q.id, 1000)));
 
-  const rows: string[] = ['question,word,count'];
+  // Заголовки на русском — основные пользователи опросов читают CSV
+  // в Excel/Numbers с русской локалью; «question/word/count» вызывали
+  // вопросы у нетехнических создателей опросов.
+  const rows: string[] = ['вопрос,ответ,количество ответов'];
   for (let i = 0; i < qs.length; i++) {
     const q = qs[i];
     const top = aggregates[i];

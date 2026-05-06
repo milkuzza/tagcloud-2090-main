@@ -25,22 +25,38 @@ export const CreateSurveySchema = z
   .object({
     title: z.string().trim().max(200).optional(),
     caseSensitive: z.boolean().default(false),
-    colorScheme: z.enum(['mono', 'random', 'custom']),
+    colorScheme: z.enum(['mono', 'random', 'custom', 'custom_gradient']),
     customPalette: z
       .array(z.string().regex(HEX_COLOR, 'Цвет должен быть в формате #RRGGBB'))
       .min(1)
       .max(10)
       .optional(),
+    // Лимит слов в облаке: 1..200 — UX-разумный потолок (BD CHECK ставит 500).
+    // 50 — дефолт: примерно столько хорошо помещается в стандартное облако.
+    maxWords: z.number().int().min(1, 'Минимум 1 слово').max(200, 'Максимум 200 слов').default(50),
+    allowVertical: z.boolean().default(false),
     expiresAt: z.coerce.date(),
     questions: z
       .array(QuestionInputSchema)
       .min(1, 'Нужен хотя бы один вопрос')
       .max(500, 'Не больше 500 вопросов')
   })
-  .refine((d) => d.colorScheme !== 'custom' || (d.customPalette && d.customPalette.length > 0), {
-    message: 'customPalette обязательна при colorScheme=custom',
-    path: ['customPalette']
-  })
+  .refine(
+    (d) =>
+      (d.colorScheme !== 'custom' && d.colorScheme !== 'custom_gradient') ||
+      (d.customPalette && d.customPalette.length > 0),
+    {
+      message: 'customPalette обязательна при colorScheme=custom/custom_gradient',
+      path: ['customPalette']
+    }
+  )
+  .refine(
+    (d) => d.colorScheme !== 'custom_gradient' || (d.customPalette && d.customPalette.length >= 2),
+    {
+      message: 'Для градиента нужно минимум 2 цвета',
+      path: ['customPalette']
+    }
+  )
   .refine((d) => d.expiresAt.getTime() >= Date.now() + HOUR_MS - 60_000, {
     message: 'Срок должен быть как минимум через 1 час',
     path: ['expiresAt']

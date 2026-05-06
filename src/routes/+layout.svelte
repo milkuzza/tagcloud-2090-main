@@ -12,7 +12,7 @@
 
 <header class="topbar">
   <a class="brand" href={data.user ? '/my' : '/'}>
-    <img class="brand-logo" src="/logo2090.png" alt="ГБОУ Школа №2090" />
+    <img class="brand-logo" src="/logo2090.png" alt="Школа №2090" />
     <span class="brand-text">Облако тегов</span>
   </a>
 
@@ -30,7 +30,7 @@
 </main>
 
 <footer class="footer">
-  <span>ГБОУ Школа №2090 · образовательный проект</span>
+  <span>Школа №2090 · образовательный проект</span>
 </footer>
 
 <style>

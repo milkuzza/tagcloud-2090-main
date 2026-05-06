@@ -32,6 +32,8 @@ export async function createSurvey(
         caseSensitive: input.caseSensitive,
         colorScheme: input.colorScheme,
         customPalette: input.customPalette ?? null,
+        maxWords: input.maxWords,
+        allowVertical: input.allowVertical,
         expiresAt: input.expiresAt
       })
       .returning({

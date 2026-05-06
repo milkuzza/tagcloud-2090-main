@@ -63,7 +63,7 @@ export function resultsHtml(opts: ResultsTemplateInput): string {
       </table>
       <table width="100%" style="border-collapse:collapse;margin-top:16px;">${items}</table>
       <p style="color:${MUTED};font-size:12px;margin-top:32px;border-top:1px solid ${BORDER};padding-top:16px;line-height:1.5;">
-        Автоматическое сообщение от сервиса опросов ГБОУ Школа №2090.<br>
+        Автоматическое сообщение от сервиса опросов Школа №2090.<br>
         Не отвечайте на это письмо.
       </p>
     </td></tr>

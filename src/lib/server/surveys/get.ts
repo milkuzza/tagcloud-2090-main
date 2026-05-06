@@ -16,6 +16,10 @@ export type SurveyPublic = {
   expiresAt: Date;
   status: 'active' | 'expired' | 'sent' | 'failed';
   questions: QuestionPublic[];
+  colorScheme: 'mono' | 'random' | 'custom' | 'custom_gradient';
+  customPalette: string[] | null;
+  maxWords: number;
+  allowVertical: boolean;
 };
 
 export type SurveyForCreator = SurveyPublic & {
@@ -23,8 +27,6 @@ export type SurveyForCreator = SurveyPublic & {
   creatorEmail: string;
   creatorToken: string;
   caseSensitive: boolean;
-  colorScheme: 'mono' | 'random' | 'custom';
-  customPalette: string[] | null;
   createdAt: Date;
 };
 
@@ -69,7 +71,11 @@ export async function getSurveyPublic(code: string): Promise<SurveyPublic | null
     title: survey.title,
     expiresAt: survey.expiresAt,
     status: survey.status,
-    questions: qs
+    questions: qs,
+    colorScheme: survey.colorScheme,
+    customPalette: survey.customPalette,
+    maxWords: survey.maxWords,
+    allowVertical: survey.allowVertical
   };
 }
 
@@ -98,6 +104,8 @@ export async function getSurveyForCreator(
     caseSensitive: survey.caseSensitive,
     colorScheme: survey.colorScheme,
     customPalette: survey.customPalette,
+    maxWords: survey.maxWords,
+    allowVertical: survey.allowVertical,
     createdAt: survey.createdAt,
     questions: qs
   };

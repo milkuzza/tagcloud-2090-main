@@ -42,11 +42,17 @@ function getPool(): Piscina {
   return pool;
 }
 
+export type RenderOptions = {
+  maxWords?: number;
+  allowVertical?: boolean;
+};
+
 export async function renderPng(
   words: CloudWord[],
   scheme: ColorScheme,
   palette: string[] | null,
-  size: RenderSize = DEFAULT_SIZE
+  size: RenderSize = DEFAULT_SIZE,
+  opts: RenderOptions = {}
 ): Promise<Buffer> {
   const start = performance.now();
   const result = await getPool().run({
@@ -54,7 +60,9 @@ export async function renderPng(
     scheme,
     palette,
     width: size.width,
-    height: size.height
+    height: size.height,
+    maxWords: opts.maxWords ?? 50,
+    allowVertical: opts.allowVertical ?? false
   });
   observeRenderDuration((performance.now() - start) / 1000);
   // piscina возвращает Buffer как есть — он передаётся через

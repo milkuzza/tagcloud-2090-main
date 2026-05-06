@@ -12,7 +12,7 @@ import {
   pgEnum
 } from 'drizzle-orm/pg-core';
 
-export const colorScheme = pgEnum('color_scheme', ['mono', 'random', 'custom']);
+export const colorScheme = pgEnum('color_scheme', ['mono', 'random', 'custom', 'custom_gradient']);
 export const answerType = pgEnum('answer_type', ['single', 'multi']);
 export const surveyStatus = pgEnum('survey_status', ['active', 'expired', 'sent', 'failed']);
 
@@ -71,6 +71,8 @@ export const surveys = pgTable(
     caseSensitive: boolean('case_sensitive').notNull().default(false),
     colorScheme: colorScheme('color_scheme').notNull().default('mono'),
     customPalette: jsonb('custom_palette').$type<string[] | null>(),
+    maxWords: integer('max_words').notNull().default(50),
+    allowVertical: boolean('allow_vertical').notNull().default(false),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     status: surveyStatus('status').notNull().default('active'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()

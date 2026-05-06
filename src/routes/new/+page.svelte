@@ -13,10 +13,14 @@
 
   let title = $state('');
   let caseSensitive = $state(false);
-  let colorScheme = $state<'mono' | 'random' | 'custom'>('mono');
+  let colorScheme = $state<'mono' | 'random' | 'custom' | 'custom_gradient'>('mono');
   let customPalette = $state<string[]>(['#0E2A5C']);
   let durationPreset = $state<'1h' | '1d' | '7d' | 'custom'>('1d');
   let customExpiresAt = $state('');
+  // Правка №3: лимит на количество слов в облаке + допуск вертикальной
+  // ориентации. Дефолт 50 — балансирует плотность облака и читаемость.
+  let maxWords = $state<number>(50);
+  let allowVertical = $state<boolean>(false);
   let questions = $state<Question[]>([{ text: '', answerType: 'single', maxAnswers: 5 }]);
 
   let submitting = $state(false);
@@ -44,6 +48,13 @@
   function removeColor(i: number) {
     if (customPalette.length > 1) customPalette.splice(i, 1);
   }
+  // Для градиента нужно минимум 2 стопа: при переключении на
+  // 'custom_gradient' с одним цветом — добиваем светло-голубым.
+  function ensurePaletteForScheme(s: typeof colorScheme) {
+    if (s === 'custom_gradient' && customPalette.length < 2) {
+      customPalette.push('#2D9FDA');
+    }
+  }
 
   function computeExpiresAt(): string {
     const now = Date.now();
@@ -61,7 +72,10 @@
         title: title.trim() || undefined,
         caseSensitive,
         colorScheme,
-        customPalette: colorScheme === 'custom' ? customPalette : undefined,
+        customPalette:
+          colorScheme === 'custom' || colorScheme === 'custom_gradient' ? customPalette : undefined,
+        maxWords,
+        allowVertical,
         expiresAt: computeExpiresAt(),
         questions: questions.map((q) => ({
           text: q.text.trim(),
@@ -121,6 +135,13 @@
     </div>
     <img class="qr" src={result.qrPngBase64} alt="QR код" />
   </section>
+
+  <!-- Правка №7: с экрана «Опрос создан» сразу можно открыть
+       публичный просмотр облака (как на «Спасибо!» из правки №2). -->
+  <div class="created-actions">
+    <a class="btn btn-primary" href={`/c/${result.code}`}>Посмотреть облако</a>
+    <a class="btn btn-ghost" href={result.dashboardUrl}>Перейти в дашборд</a>
+  </div>
 {:else}
   <h1>Создать опрос</h1>
   <p class="muted">Результаты придут на <strong>{data.email}</strong> по истечении срока.</p>
@@ -166,21 +187,30 @@
     <fieldset>
       <legend>Цветовая схема</legend>
       <div class="segmented" role="radiogroup" aria-label="Цветовая схема">
-        {#each [['mono', 'Чёрно-белая'], ['random', 'Случайные цвета'], ['custom', 'Своя палитра']] as [v, label] (v)}
+        {#each [['mono', 'Чёрно-белая'], ['random', 'Случайные цвета'], ['custom', 'Своя палитра (случайно)'], ['custom_gradient', 'Своя палитра (по популярности)']] as [v, label] (v)}
           <button
             type="button"
             class="seg"
             class:active={colorScheme === v}
             role="radio"
             aria-checked={colorScheme === v}
-            onclick={() => (colorScheme = v as typeof colorScheme)}
+            onclick={() => {
+              colorScheme = v as typeof colorScheme;
+              ensurePaletteForScheme(colorScheme);
+            }}
           >
             {label}
           </button>
         {/each}
       </div>
-      {#if colorScheme === 'custom'}
+      {#if colorScheme === 'custom' || colorScheme === 'custom_gradient'}
         <div class="palette">
+          {#if colorScheme === 'custom_gradient'}
+            <p class="hint">
+              Минимум 2 цвета: первый — для самого редкого ответа, последний — для самого
+              популярного. Промежуточные цвета задают многосегментный градиент.
+            </p>
+          {/if}
           {#each customPalette as _, i (i)}
             <div class="swatch">
               <input type="color" bind:value={customPalette[i]} aria-label="Цвет" />
@@ -195,7 +225,8 @@
                 type="button"
                 class="btn btn-ghost btn-sm swatch-remove"
                 onclick={() => removeColor(i)}
-                disabled={customPalette.length === 1}
+                disabled={customPalette.length === 1 ||
+                  (colorScheme === 'custom_gradient' && customPalette.length === 2)}
                 aria-label="Удалить цвет"
               >
                 ×
@@ -207,8 +238,36 @@
               + Добавить цвет ({customPalette.length}/10)
             </button>
           {/if}
+          {#if colorScheme === 'custom_gradient' && customPalette.length >= 2}
+            <div
+              class="gradient-preview"
+              style={`background: linear-gradient(to right, ${customPalette.join(', ')});`}
+              aria-hidden="true"
+            ></div>
+          {/if}
         </div>
       {/if}
+    </fieldset>
+
+    <fieldset>
+      <legend>Параметры облака</legend>
+      <label class="max-words">
+        <span class="max-words-label">Максимум слов в облаке</span>
+        <input
+          class="input max-words-input"
+          type="number"
+          min="1"
+          max="200"
+          step="1"
+          inputmode="numeric"
+          bind:value={maxWords}
+          required
+        />
+      </label>
+      <label class="check">
+        <input type="checkbox" bind:checked={allowVertical} />
+        <span>Допускать вертикальную ориентацию</span>
+      </label>
     </fieldset>
 
     <fieldset>
@@ -431,6 +490,38 @@
   .max-answers-input {
     width: 88px;
     text-align: center;
+  }
+  .max-words {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .max-words-label {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--c-text);
+  }
+  .max-words-input {
+    width: 96px;
+    text-align: center;
+  }
+  .hint {
+    color: var(--c-muted);
+    font-size: 0.875rem;
+    margin: 0;
+  }
+  .gradient-preview {
+    height: 18px;
+    border-radius: var(--radius);
+    border: 1px solid var(--c-border);
+    margin-top: var(--space-2);
+  }
+  .created-actions {
+    display: flex;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+    flex-wrap: wrap;
   }
   .q-head strong {
     font-weight: 500;
