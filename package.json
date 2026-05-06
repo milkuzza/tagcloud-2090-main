@@ -20,7 +20,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx ./scripts/migrate.ts",
     "db:studio": "drizzle-kit studio",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "patch-package"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
@@ -40,6 +41,7 @@
     "eslint-plugin-svelte": "^3.17.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
+    "patch-package": "^8.0.1",
     "prettier": "^3.8.3",
     "prettier-plugin-svelte": "^3.5.1",
     "svelte": "^5.0.0",

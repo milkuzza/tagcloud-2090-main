@@ -179,10 +179,16 @@ export default async function render(job) {
           weight: weights(count)
         }))
       )
-      // Padding=8: совпадает с клиентом (`src/lib/cloud-render.ts`),
-      // даёт визуальный воздух между словами и снижает шанс
-      // наложения для повёрнутых спрайтов.
-      .padding(8)
+      // Padding=6: совпадает с клиентом (`src/lib/cloud-render.ts`),
+      // даёт визуальный воздух между словами. Главную работу по
+      // предотвращению наложений делает патч d3-cloud
+      // (`patches/d3-cloud+1.2.9.patch`):
+      //   1) форсирует textBaseline='middle' в sprite — без этого
+      //      sprite-маска коллизий стояла на 0.3*fontSize выше глифа,
+      //      и крупные/повёрнутые слова визуально наезжали на соседей;
+      //   2) добавляет 2*padding к sprite container ДО rotation-матрицы,
+      //      чтобы halo strokeText помещался в маску по обеим осям.
+      .padding(6)
       // d3-cloud использует random() для:
       //   1) стартовой позиции каждого слова —
       //        d.x = (size[0] * (random()+0.5)) >> 1 → [0.25w; 0.75w];
@@ -198,8 +204,12 @@ export default async function render(job) {
       // (равновероятно влево/вправо), остальные — горизонтально.
       // Используем отдельный mulberry32, чтобы не пересекаться с
       // принудительным 0.5 для placement.
-      .rotate(() => {
+      // Самое популярное слово (первое после сортировки) всегда
+      // горизонтально — иначе при длинном топ-слове оно не помещается
+      // в высоту canvas в повёрнутом виде и теряется.
+      .rotate((d, i) => {
         if (!allowVertical) return 0;
+        if (i === 0) return 0;
         if (rotateRng() >= 0.4) return 0;
         return rotateRng() < 0.5 ? -90 : 90;
       })
@@ -209,6 +219,10 @@ export default async function render(job) {
       .on('end', (placed) => {
         ctx.save();
         ctx.translate(width / 2, height / 2);
+        // textBaseline='middle' соответствует sprite-маске d3-cloud
+        // (см. `patches/d3-cloud+1.2.9.patch` — там форсируется тот же
+        // baseline). Это устраняет рассинхрон между позицией маски
+        // коллизий и пользовательского рендера ≈0.3*fontSize.
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         for (const w of placed) {
