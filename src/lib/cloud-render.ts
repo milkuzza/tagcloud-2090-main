@@ -106,7 +106,10 @@ export async function renderCloud(
   const pickColor = colorPicker(scheme, palette, sorted);
   const weights = fontWeightFor(sorted);
 
-  const rng = makeRng(0xc0de);
+  // Для `.rotate` оставляем настоящий mulberry32 — нам нужна
+  // случайная (но детерминированная) ориентация ±90° у части слов
+  // при `allowVertical=true`.
+  const rotateRng = makeRng(0xc0de);
 
   // d3-cloud сам не предоставляет canvas в браузере — передаём фабрику
   // 1×1 offscreen canvas для замеров текста.
@@ -140,15 +143,31 @@ export async function renderCloud(
         .padding(8)
         .rotate(() => {
           if (!opts.allowVertical) return 0;
-          if (rng() >= 0.4) return 0;
-          return rng() < 0.5 ? -90 : 90;
+          if (rotateRng() >= 0.4) return 0;
+          return rotateRng() < 0.5 ? -90 : 90;
         })
         .font(FONT)
         .fontSize((d) => (d as { size: number }).size)
         .fontWeight((d) => String((d as { weight: number }).weight))
         .on('end', (placed: PlacedWord[]) => resolve(placed));
+      // d3-cloud по умолчанию использует Math.random() для:
+      //   1) стартовой позиции каждого слова:
+      //        d.x = (size[0] * (random()+0.5))>>1 → [0.25w; 0.75w]
+      //   2) направления спирали (CW/CCW) внутри place().
+      // Из-за пункта 1 даже самое крупное слово оказывалось «где-то
+      // в центральной полосе», но не строго в центре — облако
+      // выглядело хаотично. Возврат 0.5 даёт `d.x = w/2, d.y = h/2`,
+      // т.е. ВСЕ слова стартуют ровно в центре. Сортировка по убыванию
+      // count + sequential placement в d3-cloud гарантирует, что:
+      //   - топ-слово ложится в (0,0) (нет коллизий → не двигается);
+      //   - следующее по популярности коллидирует с топ-словом и
+      //     уходит на минимально возможный радиус по архимедовой
+      //     спирали;
+      //   - чем дальше слово в порядке популярности, тем больший
+      //     радиус оно занимает.
+      // Это и есть «центр + радиальная иерархия» из задачи.
       // .random — у d3-cloud есть в рантайме, но в @types/d3-cloud отсутствует.
-      (layout as CloudWithRandom).random?.(rng);
+      (layout as CloudWithRandom).random?.(() => 0.5);
       layout.start();
     } catch (err) {
       reject(err);
