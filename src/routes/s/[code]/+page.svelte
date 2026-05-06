@@ -30,6 +30,42 @@
   const activeQuestion = $derived(survey.questions[activeIdx] ?? survey.questions[0]);
   const activeWords = $derived(words[activeQuestion?.id] ?? []);
 
+  /**
+   * Аналитика облака для активного вопроса (правка №4):
+   *   votes        — суммарное число ответов в этом вопросе;
+   *   uniqueWords  — количество уникальных нормализованных слов;
+   *   topWord      — самое популярное слово и его доля от всех голосов;
+   *   diversity    — индекс разнообразия Симпсона (1 − Σpᵢ²): 0 — все
+   *                  одинаково, 1 — максимально разнообразно;
+   *   topShare     — концентрация: доля топ-3 слов от всех голосов.
+   */
+  const analytics = $derived.by(() => {
+    const list = activeWords;
+    const votes = list.reduce((s, [, c]) => s + c, 0);
+    const uniqueWords = list.length;
+    if (votes === 0 || uniqueWords === 0) {
+      return {
+        votes: 0,
+        uniqueWords: 0,
+        topWord: null as null | { word: string; count: number; share: number },
+        diversity: 0,
+        topShare: 0
+      };
+    }
+    const sorted = [...list].sort((a, b) => b[1] - a[1]);
+    const [topWord, topCount] = sorted[0];
+    const sumSquares = list.reduce((s, [, c]) => s + (c / votes) ** 2, 0);
+    const diversity = 1 - sumSquares;
+    const top3 = sorted.slice(0, 3).reduce((s, [, c]) => s + c, 0);
+    return {
+      votes,
+      uniqueWords,
+      topWord: { word: topWord, count: topCount, share: topCount / votes },
+      diversity,
+      topShare: top3 / votes
+    };
+  });
+
   function connect() {
     if (typeof window === 'undefined') return;
     if (stopReconnect) return;
@@ -87,7 +123,11 @@
       if (cancelled) return;
       WordCloud(
         canvas!,
-        buildWordCloudOptions(list, survey.colorScheme, survey.customPalette, { baseSize: 20 })
+        buildWordCloudOptions(list, survey.colorScheme, survey.customPalette, {
+          baseSize: 20,
+          maxWords: survey.maxWords,
+          allowVertical: survey.allowVertical
+        })
       );
     })();
     return () => {
@@ -343,6 +383,42 @@
     {/if}
     <canvas bind:this={canvas} width="1200" height="700"></canvas>
   </div>
+
+  <!-- Правка №4: аналитика облака. Считаем по активному вопросу:
+       объём, уникальность, топ-слово и индекс разнообразия Симпсона. -->
+  {#if activeWords.length > 0}
+    <div class="analytics" aria-label="Аналитика облака">
+      <div class="metric">
+        <div class="metric-label">Голосов</div>
+        <div class="metric-value">{analytics.votes}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Уникальных слов</div>
+        <div class="metric-value">{analytics.uniqueWords}</div>
+      </div>
+      {#if analytics.topWord}
+        <div class="metric">
+          <div class="metric-label">Топ-слово</div>
+          <div class="metric-value metric-value-text" title={analytics.topWord.word}>
+            {analytics.topWord.word}
+          </div>
+          <div class="metric-sub">
+            {analytics.topWord.count} · {(analytics.topWord.share * 100).toFixed(0)}%
+          </div>
+        </div>
+      {/if}
+      <div class="metric">
+        <div class="metric-label">Доля топ-3</div>
+        <div class="metric-value">{(analytics.topShare * 100).toFixed(0)}%</div>
+        <div class="metric-sub">концентрация</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Разнообразие</div>
+        <div class="metric-value">{analytics.diversity.toFixed(2)}</div>
+        <div class="metric-sub">индекс Симпсона</div>
+      </div>
+    </div>
+  {/if}
 </section>
 
 <style>
@@ -539,6 +615,44 @@
     width: 100%;
     height: 100%;
     display: block;
+  }
+  .analytics {
+    margin-top: var(--space-4);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--space-3);
+  }
+  .metric {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    padding: var(--space-3);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .metric-label {
+    font-size: 0.75rem;
+    color: var(--c-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .metric-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--c-navy);
+    line-height: 1.1;
+  }
+  .metric-value-text {
+    font-size: 1.125rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .metric-sub {
+    font-size: 0.75rem;
+    color: var(--c-muted);
   }
   .empty {
     position: absolute;

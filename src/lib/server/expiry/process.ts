@@ -39,7 +39,9 @@ export async function processExpired(survey: Survey): Promise<void> {
 
     const aggregated = await Promise.all(
       qs.map(async (q) => {
-        const topWords = await aggregateQuestion(q.id, 100);
+        // Берём с запасом (×2): рендерим maxWords, но email-шаблон может
+        // показывать чуть больше в текстовой версии (top-N в письме).
+        const topWords = await aggregateQuestion(q.id, Math.max(100, survey.maxWords * 2));
         const totalVotes = topWords.reduce((s, [, c]) => s + c, 0);
         return { question: q, topWords, totalVotes };
       })
@@ -61,7 +63,10 @@ export async function processExpired(survey: Survey): Promise<void> {
       const a = aggregated[i];
       // Inline-облака пропускаем для пустых вопросов — нечего показывать.
       if (a.totalVotes === 0) continue;
-      const png = await renderPng(a.topWords, survey.colorScheme, survey.customPalette);
+      const png = await renderPng(a.topWords, survey.colorScheme, survey.customPalette, undefined, {
+        maxWords: survey.maxWords,
+        allowVertical: survey.allowVertical
+      });
       attachments.push({
         filename: `cloud_q${i + 1}.png`,
         content: png,
