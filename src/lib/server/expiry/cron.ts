@@ -25,27 +25,33 @@ let lastSessionPurgeAt = 0;
  *
  * FOR UPDATE SKIP LOCKED исключает гонку с одновременным /finish или /retry
  * и гонку с другим инстансом cron (на будущее, для multi-process).
- * RETURNING * отдаёт нам строки, которые мы реально захватили.
+ *
+ * Используем drizzle `.update().returning()`, а не raw `db.execute(... RETURNING *)`,
+ * чтобы получить типизированные строки с camelCase-полями (`maxWords`,
+ * `allowVertical`, и т.д.). Сырое `db.execute` отдаёт snake_case колонки, и
+ * дальше в `processExpired` они читаются как `undefined` → `Math.max(100,
+ * undefined * 2) = NaN` → падает SQL `LIMIT $NaN`.
  */
 async function claimBatch(now: Date, stuckThreshold: Date): Promise<Survey[]> {
   // Передаём timestamps через ::timestamptz cast: postgres-js не умеет биндить
   // Date как timestamp без подсказки, передаём ISO-строку.
   const nowIso = now.toISOString();
   const stuckIso = stuckThreshold.toISOString();
-  const rows = await db.execute<Survey>(sql`
-    UPDATE ${surveys}
-    SET status = 'expired'
-    WHERE id IN (
-      SELECT id FROM ${surveys}
-      WHERE (status = 'active' AND expires_at < ${nowIso}::timestamptz)
-         OR (status = 'expired' AND expires_at < ${stuckIso}::timestamptz)
-      ORDER BY expires_at ASC
-      LIMIT ${BATCH}
-      FOR UPDATE SKIP LOCKED
+  const claimed = await db
+    .update(surveys)
+    .set({ status: 'expired' })
+    .where(
+      sql`${surveys.id} IN (
+        SELECT id FROM ${surveys}
+        WHERE (status = 'active' AND expires_at < ${nowIso}::timestamptz)
+           OR (status = 'expired' AND expires_at < ${stuckIso}::timestamptz)
+        ORDER BY expires_at ASC
+        LIMIT ${BATCH}
+        FOR UPDATE SKIP LOCKED
+      )`
     )
-    RETURNING *
-  `);
-  return Array.from(rows);
+    .returning();
+  return claimed;
 }
 
 async function scan(): Promise<void> {
