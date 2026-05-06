@@ -1,6 +1,42 @@
 <script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
+  import { invalidateAll } from '$app/navigation';
   import type { PageProps } from './$types';
   let { data }: PageProps = $props();
+
+  /**
+   * Фоновое обновление списка, пока есть опросы в нетерминальных
+   * статусах (active/expired). Без этого пользователь, оставивший
+   * вкладку открытой, видел «Истёк» бесконечно — даже после того, как
+   * email уже отправился и реальный статус стал 'sent'/'failed'.
+   *
+   * 30 секунд — компромисс: чаще не нужно (опрос обычно живёт минуты-
+   * часы), реже — пользователь успевает забыть и закрыть вкладку. На
+   * /my у нас нет WS, поэтому добавлять отдельную инфраструктуру под
+   * один кейс — оверкилл; короткий debounced poll достаточно.
+   */
+  const POLL_MS = 30_000;
+  let pollHandle: ReturnType<typeof setInterval> | null = null;
+
+  function hasNonTerminal(): boolean {
+    return data.surveys.some((s) => s.status === 'active' || s.status === 'expired');
+  }
+
+  onMount(() => {
+    if (!hasNonTerminal()) return;
+    pollHandle = setInterval(() => {
+      if (!hasNonTerminal()) {
+        if (pollHandle) clearInterval(pollHandle);
+        pollHandle = null;
+        return;
+      }
+      void invalidateAll();
+    }, POLL_MS);
+  });
+
+  onDestroy(() => {
+    if (pollHandle) clearInterval(pollHandle);
+  });
 
   function fmtDate(d: Date | string): string {
     return new Date(d).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });

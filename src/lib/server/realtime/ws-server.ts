@@ -32,6 +32,18 @@ wss.on(
 );
 
 /**
+ * Безопасное декодирование URL-percent-encoded path: /ws/abc%20def → /ws/abc def.
+ * Без try/catch падает на одиночном `%` (URIError).
+ */
+function safeDecode(p: string): string {
+  try {
+    return decodeURIComponent(p);
+  } catch {
+    return p;
+  }
+}
+
+/**
  * Постоянное по времени сравнение строк одинаковой длины (см.
  * `auth/access.ts` — те же требования к creatorToken).
  */
@@ -61,24 +73,32 @@ export async function handleUpgrade(
   head: Buffer
 ): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost');
-  const match = url.pathname.match(/^\/ws\/([A-Z0-9]+)$/);
+  const path = safeDecode(url.pathname);
+  // Два endpoint'a:
+  //   /ws/<code>     — креатор-режим, требует ?t=<creatorToken>;
+  //   /ws/c/<code>   — публичный read-only для /c/[code], без токена.
+  const creatorMatch = path.match(/^\/ws\/([A-Z0-9]+)$/);
+  const publicMatch = path.match(/^\/ws\/c\/([A-Z0-9]+)$/);
+  const match = creatorMatch ?? publicMatch;
   if (!match) {
     socket.destroy();
     return;
   }
+  const isPublic = !!publicMatch;
   const code = match[1];
   if (!isValidCode(code)) {
     socket.destroy();
     return;
   }
   const token = url.searchParams.get('t');
-  if (!token) {
+  if (!isPublic && !token) {
     socket.destroy();
     return;
   }
 
   // Rate-limit ДО запроса к Postgres: дешевый INCR в Redis, защищает БД
-  // от шторма handshake'ов при попытке перебрать creatorToken.
+  // от шторма handshake'ов. На публичном эндпоинте лимит особенно важен —
+  // там нет токена, любой может пытаться открыть много соединений.
   const ip = getClientIp(req);
   const rl = await checkWsRateLimit(ip);
   if (!rl.allowed) {
@@ -89,14 +109,21 @@ export async function handleUpgrade(
   }
 
   const [survey] = await db.select().from(surveys).where(eq(surveys.code, code)).limit(1);
-  if (!survey || !constantTimeEqual(survey.creatorToken, token)) {
+  if (!survey) {
+    socket.destroy();
+    return;
+  }
+  // Креаторский режим — обязательная сверка токена в constant time.
+  if (!isPublic && !constantTimeEqual(survey.creatorToken, token!)) {
     socket.destroy();
     return;
   }
 
-  // Не открываем WS для уже завершённых опросов: клиенту сразу шлём
-  // 'closed' через короткоживущий апгрейд, чтобы UI обновил состояние.
-  if (survey.status !== 'active') {
+  // Терминальные опросы (sent/failed) — короткий апгрейд только для
+  // того, чтобы клиент получил 'closed' и обновил UI. На состоянии
+  // 'expired' (transient) WS остаётся открытым: дальше processExpired
+  // сам сделает notifyClosed с финальной причиной 'sent'/'failed'.
+  if (survey.status === 'sent' || survey.status === 'failed') {
     wss.handleUpgrade(req, socket, head, (ws) => {
       try {
         ws.send(JSON.stringify({ type: 'closed', reason: survey.status }));

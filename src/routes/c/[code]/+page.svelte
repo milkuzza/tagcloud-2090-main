@@ -2,55 +2,76 @@
   import { onMount, onDestroy, untrack } from 'svelte';
   import type { PageProps } from './$types';
   import type { CloudWord } from '$lib/types/cloud';
-  import { buildWordCloudOptions } from '$lib/cloud';
+  import { renderCloud } from '$lib/cloud-render';
+  import type { ServerMsg } from '$lib/types/cloud';
 
   let { data }: PageProps = $props();
   const survey = $derived(data.survey);
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   // Initial-only чтение через untrack: SSR-снапшот фиксирован, дальше
-  // обновляем words только из poll-ответов /api/.../cloud.
+  // обновляем words только из WS-сообщений.
   let words = $state<Record<string, CloudWord[]>>(untrack(() => ({ ...data.initialWords })));
   let activeIdx = $state(0);
-  let pollHandle: ReturnType<typeof setInterval> | null = null;
-  let stopped = $state(false);
+  // Стартовое значение фиксируем через untrack: SSR-снапшот survey.status —
+  // это начальное состояние, а дальше «закрытость» идёт из WS-сообщения
+  // 'closed'. Без untrack Svelte 5 предупреждает о захвате реактивного $derived.
+  let stopped = $state(untrack(() => survey.status !== 'active'));
+
+  let ws: WebSocket | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let stopReconnect = false;
 
   const activeQuestion = $derived(survey.questions[activeIdx] ?? survey.questions[0]);
   const activeWords = $derived(words[activeQuestion?.id] ?? []);
   const totalVotes = $derived(activeWords.reduce((s, [, c]) => s + c, 0));
 
-  async function refresh(): Promise<void> {
-    try {
-      const r = await fetch(`/api/surveys/${survey.code}/cloud`, {
-        headers: { Accept: 'application/json' }
-      });
-      if (!r.ok) return;
-      const body = (await r.json()) as {
-        words: Record<string, CloudWord[]>;
-        status: string;
-      };
-      words = body.words ?? {};
-      if (body.status !== 'active') {
-        stopped = true;
-        if (pollHandle) clearInterval(pollHandle);
-        pollHandle = null;
+  /**
+   * Подключение к публичному read-only WS `/ws/c/<code>`. В отличие от
+   * креаторского `/ws/<code>` не требует токена (опрос с известным
+   * кодом — публичен по дизайну: любой респондент уже знает код).
+   * Сервер бродкастит cloud:<questionId> snapshots каждые 2.5с при
+   * наличии изменений, что покрывает любой кейс «облако обновляется».
+   * Поллинга больше нет — нагрузка на Postgres от просмотра страницы
+   * /c/[code] стремится к нулю (только при поступлении нового голоса
+   * Redis-агрегат пересчитывается, и WS уже подписан на pub/sub).
+   */
+  function connect(): void {
+    if (typeof window === 'undefined') return;
+    if (stopReconnect || stopped) return;
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${proto}://${window.location.host}/ws/c/${survey.code}`);
+    ws.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data) as ServerMsg;
+        if (msg.type === 'snapshot') {
+          words = { ...words, [msg.questionId]: msg.words };
+        } else if (msg.type === 'closed') {
+          stopReconnect = true;
+          stopped = true;
+          ws?.close();
+        }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* offline / network blip — пропустим тик, попробуем в следующий */
-    }
+    };
+    ws.onclose = () => {
+      if (stopReconnect) return;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      // Экспоненциальная пауза не нужна — обычные WS-разрывы редки и
+      // 3 секунды дают серверу спокойно перезапуститься.
+      reconnectTimer = setTimeout(connect, 3000);
+    };
   }
 
   onMount(() => {
-    // Поллинг — компромисс между свежестью данных и нагрузкой: 5с
-    // достаточно для кейса «зашёл посмотреть после ответа», и при этом
-    // не создаёт штормов SQL даже на больших опросах.
-    if (survey.status === 'active') {
-      pollHandle = setInterval(refresh, 5000);
-    }
+    if (!stopped) connect();
   });
 
   onDestroy(() => {
-    if (pollHandle) clearInterval(pollHandle);
+    stopReconnect = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (ws && ws.readyState === ws.OPEN) ws.close(1000, 'page unload');
   });
 
   $effect(() => {
@@ -63,21 +84,21 @@
       ctx!.fillRect(0, 0, canvas.width, canvas.height);
       return;
     }
-    let cancelled = false;
-    void (async () => {
-      const WordCloud = (await import('wordcloud')).default;
-      if (cancelled) return;
-      WordCloud(
-        canvas!,
-        buildWordCloudOptions(list, survey.colorScheme, survey.customPalette, {
-          baseSize: 20,
-          maxWords: survey.maxWords,
-          allowVertical: survey.allowVertical
-        })
-      );
-    })();
+    const token = { cancelled: false };
+    void renderCloud(
+      canvas,
+      list,
+      survey.colorScheme,
+      survey.customPalette,
+      {
+        baseSize: 20,
+        maxWords: survey.maxWords,
+        allowVertical: survey.allowVertical
+      },
+      token
+    );
     return () => {
-      cancelled = true;
+      token.cancelled = true;
     };
   });
 </script>

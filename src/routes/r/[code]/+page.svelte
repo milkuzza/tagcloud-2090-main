@@ -20,10 +20,15 @@
   // ответов один вопрос, одна-две кнопки в зависимости от типа.
   let currentIdx = $state(0);
 
-  // ответы: questionId -> string[]
+  // ответы: questionId -> string[]. На multi-вопросе массив наполняется
+  // по мере нажатия «Ответить»; на single — всегда длиной 1.
   let answers = $state<Record<string, string[]>>(
-    Object.fromEntries(survey.questions.map((q) => [q.id, ['']]))
+    Object.fromEntries(survey.questions.map((q) => [q.id, []]))
   );
+
+  // Текущее значение единственного поля ввода. Очищается после каждого
+  // нажатия «Ответить» в multi-режиме.
+  let inputValue = $state('');
 
   let errorMessage = $state<string | null>(null);
   let errorQuestionId = $state<string | null>(null);
@@ -43,80 +48,86 @@
     return s.replace(/\s+/g, '');
   }
 
-  function onSingleInput(qid: string, value: string) {
-    answers[qid][0] = stripWhitespace(value);
-  }
-
-  function onMultiInput(qid: string, idx: number, value: string) {
-    answers[qid][idx] = stripWhitespace(value);
-  }
-
-  function maxFor(qid: string): number {
-    const q = survey.questions.find((q) => q.id === qid);
-    return q?.maxAnswers ?? 20;
-  }
-
-  function addWord(qid: string) {
-    if (answers[qid].length < maxFor(qid)) answers[qid].push('');
-  }
-
-  function removeWord(qid: string, idx: number) {
-    if (answers[qid].length > 1) answers[qid].splice(idx, 1);
-  }
-
   function blockSpace(e: KeyboardEvent) {
     if (e.key === ' ' || e.code === 'Space') {
       e.preventDefault();
     }
   }
 
-  const currentQuestion = $derived(survey.questions[currentIdx]);
-  const isLast = $derived(currentIdx === survey.questions.length - 1);
-
-  /**
-   * Валидация заполненности активного вопроса. Для single — есть слово,
-   * для multi — есть хотя бы одно непустое слово. Это локальный pre-check;
-   * сервер делает полную проверку и лимиты.
-   */
-  function validateCurrent(): string | null {
-    const q = currentQuestion;
-    if (!q) return null;
-    const words = (answers[q.id] ?? []).map((w) => w.trim()).filter((w) => w.length > 0);
-    if (words.length === 0) return 'Введите хотя бы одно слово';
-    if (q.answerType === 'single' && words.length > 1) {
-      return 'В этом вопросе допускается только одно слово';
-    }
-    return null;
+  function removeWord(qid: string, idx: number) {
+    answers[qid].splice(idx, 1);
   }
 
+  const currentQuestion = $derived(survey.questions[currentIdx]);
+  const isLast = $derived(currentIdx === survey.questions.length - 1);
+  const currentAnswers = $derived(answers[currentQuestion?.id ?? ''] ?? []);
+  const currentMax = $derived(
+    currentQuestion?.answerType === 'multi' ? currentQuestion.maxAnswers : 1
+  );
+  const reachedLimit = $derived(currentAnswers.length >= currentMax);
+
   /**
-   * Кнопка «Ответить»: валидируем активный вопрос, переходим к следующему;
-   * на последнем вопросе — отправляем накопленные ответы на сервер.
+   * Кнопка «Ответить».
+   *
+   * - single: фиксирует ответ и сразу переходит к следующему вопросу
+   *   (или submit на последнем) — это требование правки №5: «Одно слово»
+   *   = одно поле ввода + одна кнопка «Ответить».
+   *
+   * - multi: добавляет слово в локальный буфер ответов на этот вопрос,
+   *   очищает поле, остаётся на том же вопросе. Когда буфер достигает
+   *   maxAnswers — авто-переход (логично: больше ответов всё равно
+   *   нельзя). Кнопки добавления/удаления полей нет, всё через одно
+   *   общее поле — баг №5 («кнопок добавления полей быть не должно»).
    */
   async function answerCurrent(): Promise<void> {
     errorMessage = null;
     errorQuestionId = null;
-    const err = validateCurrent();
-    if (err) {
-      errorQuestionId = currentQuestion.id;
-      errorMessage = err;
+    const q = currentQuestion;
+    if (!q) return;
+    const word = stripWhitespace(inputValue).trim();
+    if (!word) {
+      errorQuestionId = q.id;
+      errorMessage = 'Введите слово';
       return;
     }
-    if (isLast) {
-      await submit();
-    } else {
-      currentIdx += 1;
+    // Дубликаты: один и тот же ответ от одного пользователя — это шум.
+    // Лучше предупредить, чем тихо пропустить или удвоить голос.
+    if (answers[q.id].includes(word)) {
+      errorQuestionId = q.id;
+      errorMessage = 'Это слово уже добавлено';
+      return;
+    }
+    if (answers[q.id].length >= currentMax) {
+      errorQuestionId = q.id;
+      errorMessage = 'Достигнут лимит ответов на этот вопрос';
+      return;
+    }
+    answers[q.id].push(word);
+    inputValue = '';
+
+    if (q.answerType === 'single') {
+      if (isLast) await submit();
+      else currentIdx += 1;
+      return;
+    }
+    // multi: остаёмся на вопросе пока есть свободные слоты;
+    // достигнут лимит — авто-переход.
+    if (answers[q.id].length >= currentMax) {
+      if (isLast) await submit();
+      else currentIdx += 1;
     }
   }
 
   /**
-   * «Следующий вопрос» в multi: если поле пусто — пропускаем; если
-   * заполнено — фиксируем (как «Ответить») и идём дальше. На последнем
-   * вопросе кнопки нет, но если вызвалась — поведение совпадает.
+   * «Следующий вопрос» в multi: уходит дальше, не требуя дополнительного
+   * ответа в текущем вопросе. Уже добавленные слова сохраняются в
+   * answers[qid]. На последнем вопросе кнопка не показывается;
+   * финальный «Завершить» инициирует submit.
    */
   async function nextOrSkip(): Promise<void> {
     errorMessage = null;
     errorQuestionId = null;
+    inputValue = '';
     if (isLast) {
       await submit();
       return;
@@ -135,7 +146,8 @@
     };
 
     if (payload.answers.length === 0) {
-      errorMessage = 'Заполни хотя бы один ответ';
+      errorMessage = 'Заполните хотя бы один ответ';
+      screen = 'form';
       return;
     }
 
@@ -218,55 +230,40 @@
           {currentQuestion.text}
         </legend>
 
-        {#if currentQuestion.answerType === 'single'}
-          <input
-            class="input"
-            type="text"
-            value={answers[currentQuestion.id][0] ?? ''}
-            oninput={(e) => onSingleInput(currentQuestion.id, e.currentTarget.value)}
-            onkeydown={blockSpace}
-            maxlength="50"
-            placeholder="одно слово"
-            autocomplete="off"
-          />
-          <div class="hint">Только одно слово, без пробелов</div>
-        {:else}
-          <div class="multi">
-            {#each answers[currentQuestion.id] as _, idx (idx)}
-              <div class="row">
-                <input
-                  class="input"
-                  type="text"
-                  value={answers[currentQuestion.id][idx] ?? ''}
-                  oninput={(e) => onMultiInput(currentQuestion.id, idx, e.currentTarget.value)}
-                  onkeydown={blockSpace}
-                  maxlength="50"
-                  placeholder="слово"
-                  autocomplete="off"
-                />
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-sm mini"
-                  onclick={() => removeWord(currentQuestion.id, idx)}
-                  disabled={answers[currentQuestion.id].length === 1}
-                  aria-label="Удалить слово"
-                >
-                  ×
-                </button>
-              </div>
-            {/each}
-            {#if answers[currentQuestion.id].length < currentQuestion.maxAnswers}
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm"
-                onclick={() => addWord(currentQuestion.id)}
-              >
-                + слово ({answers[currentQuestion.id].length}/{currentQuestion.maxAnswers})
-              </button>
-            {:else}
-              <div class="hint">Максимум {currentQuestion.maxAnswers} слов</div>
-            {/if}
+        <input
+          class="input"
+          type="text"
+          value={inputValue}
+          oninput={(e) => (inputValue = stripWhitespace(e.currentTarget.value))}
+          onkeydown={blockSpace}
+          maxlength="50"
+          placeholder="одно слово"
+          autocomplete="off"
+          disabled={reachedLimit && currentQuestion.answerType === 'multi'}
+        />
+        {#if currentQuestion.answerType === 'multi'}
+          <div class="hint">
+            Ответов: {currentAnswers.length} / {currentMax}
           </div>
+          {#if currentAnswers.length > 0}
+            <ul class="chips">
+              {#each currentAnswers as w, idx (idx)}
+                <li class="chip">
+                  <span>{w}</span>
+                  <button
+                    type="button"
+                    class="chip-x"
+                    onclick={() => removeWord(currentQuestion.id, idx)}
+                    aria-label="Удалить слово"
+                  >
+                    ×
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        {:else}
+          <div class="hint">Только одно слово, без пробелов</div>
         {/if}
       </fieldset>
 
@@ -275,20 +272,28 @@
       {/if}
 
       <div class="actions">
-        <!-- single = одна кнопка, multi = две (Ответить + Следующий вопрос).
-             На последнем вопросе обе ведут к submit, на промежуточных —
-             nextOrSkip перелистывает без жёсткой валидации. -->
-        <button type="submit" class="btn btn-primary btn-lg" disabled={screen === 'sending'}>
-          {screen === 'sending' ? 'Отправляем…' : isLast ? 'Ответить и завершить' : 'Ответить'}
+        <!-- single — одна кнопка «Ответить», она же сразу переключает на
+             следующий вопрос (или submit на последнем).
+             multi — две кнопки: «Ответить» добавляет слово в буфер и
+             остаётся на вопросе; «Следующий вопрос» уходит дальше
+             (или submit на последнем). На последнем вопросе вместо
+             «Следующий» — «Завершить». -->
+        <button
+          type="submit"
+          class="btn btn-primary btn-lg"
+          disabled={screen === 'sending' ||
+            (currentQuestion.answerType === 'multi' && reachedLimit)}
+        >
+          {screen === 'sending' ? 'Отправляем…' : 'Ответить'}
         </button>
-        {#if currentQuestion.answerType === 'multi' && !isLast}
+        {#if currentQuestion.answerType === 'multi'}
           <button
             type="button"
             class="btn btn-ghost btn-lg"
             disabled={screen === 'sending'}
             onclick={() => void nextOrSkip()}
           >
-            Следующий вопрос
+            {isLast ? 'Завершить' : 'Следующий вопрос'}
           </button>
         {/if}
       </div>
@@ -370,26 +375,35 @@
     color: var(--c-muted);
     font-size: 0.875rem;
   }
-  .multi {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-  .row {
-    display: flex;
-    gap: var(--space-2);
-    align-items: stretch;
-  }
-  .row .input {
-    flex: 1;
-    min-width: 0;
-  }
-  .row .mini {
-    flex-shrink: 0;
-    min-width: 44px;
+  .chips {
+    list-style: none;
+    margin: var(--space-2) 0 0;
     padding: 0;
-    font-size: 1.2rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px 4px 12px;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: var(--c-bg-2, #f5f5f5);
+    font-size: 0.95rem;
+  }
+  .chip-x {
+    border: none;
+    background: transparent;
+    color: var(--c-muted);
+    cursor: pointer;
+    font-size: 1.1rem;
     line-height: 1;
+    padding: 0 2px;
+  }
+  .chip-x:hover {
+    color: var(--c-danger);
   }
   .alert {
     padding: var(--space-3);
@@ -421,9 +435,6 @@
     .actions .btn-lg {
       flex: 1;
       width: 100%;
-    }
-    .row .mini {
-      min-height: 44px;
     }
   }
 </style>
