@@ -4,9 +4,17 @@ import { surveys, type Survey } from '../schema';
 import { processExpired } from './process';
 import { purgeExpiredSessions } from '../auth/sessions';
 import { purgeExpiredVerificationTokens } from '../auth/verification';
+import { notifyUserSurveyStatus } from '../realtime/broadcast';
 import { log, withLogContext } from '../log';
 
-const TICK_MS = 60_000;
+// 5 секунд: компромисс между нагрузкой и UX. claimBatch — это один
+// SELECT ... FOR UPDATE SKIP LOCKED; на пустой выборке — миллисекунды,
+// на непустой — обработка идёт в `processExpired` (рендер PNG, SMTP).
+// При 60-сек тике пользователь после истечения опроса видит «Истёк»
+// слишком долго. Per-user WS push (см. broadcast.ts) уже доставляет
+// финальный статус мгновенно, но 5-сек тик уменьшает максимальный
+// разрыв между expires_at и началом обработки до 5с.
+const TICK_MS = 5_000;
 const BATCH = 20;
 // Recovery: добиваем survey, который застрял в 'expired' (процесс упал
 // между atomic UPDATE active→expired и финальным sent/failed)
@@ -65,6 +73,10 @@ async function scan(): Promise<void> {
     if (claimed.length > 0) {
       log.info('cron_claimed_surveys', { count: claimed.length });
       for (const s of claimed) {
+        // Push промежуточного статуса 'expired' владельцу: /my на
+        // других вкладках/девайсах сразу увидит «Истёк», даже если
+        // processExpired ещё крутит SMTP.
+        notifyUserSurveyStatus(s.userId, s.code, 'expired');
         await withLogContext({ surveyCode: s.code, surveyId: s.id }, () => processExpired(s));
       }
     }

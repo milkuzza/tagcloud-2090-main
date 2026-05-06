@@ -133,7 +133,11 @@ export async function renderCloud(
             weight: weights(count)
           }))
         )
-        .padding(3)
+        // Padding=8 даёт видимый воздух между словами и снижает риск
+        // визуального наложения, особенно для повёрнутых на 90°
+        // спрайтов (узкая высокая bbox чувствительна к ошибкам
+        // sprite-mask коллизий при низком padding).
+        .padding(8)
         .rotate(() => {
           if (!opts.allowVertical) return 0;
           if (rng() >= 0.4) return 0;

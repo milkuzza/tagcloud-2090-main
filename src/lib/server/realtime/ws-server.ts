@@ -6,8 +6,15 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { surveys, questions } from '../schema';
 import { isValidCode } from '../surveys/codes';
-import { addSubscriber, getRoom, removeSubscriber } from './broadcast';
+import {
+  addSubscriber,
+  addUserSubscriber,
+  getRoom,
+  removeSubscriber,
+  removeUserSubscriber
+} from './broadcast';
 import { checkWsRateLimit } from '../voting/rate-limit';
+import { COOKIE_NAME, getSessionUser } from '../auth/sessions';
 import { log } from '../log';
 
 const wss = new WebSocketServer({ noServer: true });
@@ -30,6 +37,41 @@ wss.on(
     });
   }
 );
+
+// Отдельный listener для авторизованного per-user канала: подписка
+// на survey-status события для всех опросов одного пользователя.
+const wssUser = new WebSocketServer({ noServer: true });
+wssUser.on('connection', (ws: WebSocket, _req: IncomingMessage, ctx: { userId: string }) => {
+  addUserSubscriber(ctx.userId, ws);
+  ws.on('close', () => removeUserSubscriber(ctx.userId, ws));
+  ws.on('error', () => removeUserSubscriber(ctx.userId, ws));
+  ws.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.type === 'ping') ws.send(JSON.stringify({ type: 'pong' }));
+    } catch {
+      /* ignore */
+    }
+  });
+});
+
+/**
+ * Парсит сессионный cookie из заголовка `Cookie` upgrade-запроса.
+ * SvelteKit во время WS handshake не вызывает hooks/+server, поэтому
+ * проксироваться через `event.cookies` нельзя — читаем сами.
+ */
+function readSessionCookie(req: IncomingMessage): string | null {
+  const header = req.headers.cookie;
+  if (!header) return null;
+  for (const pair of header.split(';')) {
+    const eq = pair.indexOf('=');
+    if (eq < 0) continue;
+    const name = pair.slice(0, eq).trim();
+    if (name !== COOKIE_NAME) continue;
+    return pair.slice(eq + 1).trim();
+  }
+  return null;
+}
 
 /**
  * Безопасное декодирование URL-percent-encoded path: /ws/abc%20def → /ws/abc def.
@@ -74,6 +116,31 @@ export async function handleUpgrade(
 ): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost');
   const path = safeDecode(url.pathname);
+
+  // /ws/u — per-user push для /my. Аутентификация по сессионному cookie,
+  // как и REST routes под `requireUser`.
+  if (path === '/ws/u') {
+    const ip = getClientIp(req);
+    const rl = await checkWsRateLimit(ip);
+    if (!rl.allowed) {
+      log.warn('ws_user_rate_limited', { retryAfterSec: rl.retryAfterSec });
+      socket.write(`HTTP/1.1 429 Too Many Requests\r\nRetry-After: ${rl.retryAfterSec}\r\n\r\n`);
+      socket.destroy();
+      return;
+    }
+    const sessionId = readSessionCookie(req);
+    const user = await getSessionUser(sessionId);
+    if (!user) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    wssUser.handleUpgrade(req, socket, head, (ws) => {
+      wssUser.emit('connection', ws, req, { userId: user.id });
+    });
+    return;
+  }
+
   // Два endpoint'a:
   //   /ws/<code>     — креатор-режим, требует ?t=<creatorToken>;
   //   /ws/c/<code>   — публичный read-only для /c/[code], без токена.

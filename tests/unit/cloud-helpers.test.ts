@@ -105,7 +105,7 @@ describe('weightFactor', () => {
     expect(wf(0)).toBe(28);
   });
 
-  it('самое частое слово получает максимум', () => {
+  it('самое частое слово получает максимум (×SIZE_MULTIPLIER)', () => {
     const wf = weightFactor(
       [
         ['a', 1],
@@ -113,13 +113,13 @@ describe('weightFactor', () => {
       ],
       28
     );
-    // Math.log2(10+1)/Math.log2(11) = 1, baseSize * (1 + 3) = 4×baseSize
-    expect(wf(10)).toBe(28 * 4);
+    // Math.log2(10+1)/Math.log2(11) = 1, baseSize × SIZE_MULTIPLIER.
+    expect(wf(10)).toBeCloseTo(28 * 5.5, 6);
   });
 
   it('пустой массив не делит на ноль (Math.max ставит max=1)', () => {
     const wf = weightFactor([], 18);
-    // Math.log2(1+1) = 1, denom=1; для count=1 → baseSize × (1 + 1/1 × 3) = 4×base.
-    expect(wf(1)).toBe(72);
+    // Math.log2(1+1) = 1, denom=1; для count=1 → baseSize × SIZE_MULTIPLIER.
+    expect(wf(1)).toBeCloseTo(18 * 5.5, 6);
   });
 });

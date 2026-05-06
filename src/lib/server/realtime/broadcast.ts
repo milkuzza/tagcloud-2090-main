@@ -2,7 +2,7 @@ import type { WebSocket } from 'ws';
 import { redis } from '../redis';
 import { encode, type ServerMsg } from './protocol';
 import { incWsConnected, decWsConnected } from '../metrics';
-import type { CloudWord } from '$lib/types/cloud';
+import type { CloudWord, SurveyStatus } from '$lib/types/cloud';
 
 const TICK_MS = 2500;
 const TOP_N = 50;
@@ -77,6 +77,54 @@ export function notifyClosed(code: string, reason: 'expired' | 'sent' | 'failed'
     decWsConnected();
   }
   rooms.delete(code);
+}
+
+// ───────────────────────────────────────────────────────────
+// Per-user push: для /my (страница со списком опросов).
+//
+// Раньше /my узнавал об изменении статуса (active→sent) только на
+// следующем 30-сек polling-цикле. Это давало ощущение «зависшего»
+// статуса «Истёк» даже после того, как письмо уже ушло.
+//
+// Теперь каждый авторизованный клиент `/ws/u` подписывается на
+// канал `userChannels[userId]`, а `processExpired` / `/finish` /
+// `/retry` пушат `survey-status` сразу после фактической смены
+// статуса в БД.
+// ───────────────────────────────────────────────────────────
+
+const userChannels = new Map<string, Set<WebSocket>>();
+
+export function addUserSubscriber(userId: string, ws: WebSocket): void {
+  let set = userChannels.get(userId);
+  if (!set) {
+    set = new Set();
+    userChannels.set(userId, set);
+  }
+  set.add(ws);
+  incWsConnected();
+}
+
+export function removeUserSubscriber(userId: string, ws: WebSocket): void {
+  const set = userChannels.get(userId);
+  if (!set) return;
+  if (set.delete(ws)) {
+    decWsConnected();
+  }
+  if (set.size === 0) userChannels.delete(userId);
+}
+
+export function notifyUserSurveyStatus(
+  userId: string | null | undefined,
+  code: string,
+  status: SurveyStatus
+): void {
+  if (!userId) return;
+  const set = userChannels.get(userId);
+  if (!set) return;
+  const msg = encode({ type: 'survey-status', code, status });
+  for (const ws of set) {
+    if (ws.readyState === ws.OPEN) ws.send(msg);
+  }
 }
 
 function ensureTicker(): void {

@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import { surveys } from '$lib/server/schema';
 import { processExpired } from '$lib/server/expiry/process';
 import { requireCreatorAccess } from '$lib/server/auth/access';
+import { notifyUserSurveyStatus } from '$lib/server/realtime/broadcast';
 import { log, withLogContext } from '$lib/server/log';
 import type { RequestHandler } from './$types';
 
@@ -49,6 +50,10 @@ export const POST: RequestHandler = async ({ params, url, locals }) => {
       { status: 409 }
     );
   }
+
+  // Возвращаем UI в состояние «Истёк» сразу — пользователь видит,
+  // что попытка началась, до завершения SMTP.
+  notifyUserSurveyStatus(claimed.userId, claimed.code, 'expired');
 
   setImmediate(() => {
     void withLogContext({ surveyCode: claimed.code, surveyId: claimed.id }, () =>

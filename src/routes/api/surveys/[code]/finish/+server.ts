@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import { surveys } from '$lib/server/schema';
 import { processExpired } from '$lib/server/expiry/process';
 import { requireCreatorAccess } from '$lib/server/auth/access';
+import { notifyUserSurveyStatus } from '$lib/server/realtime/broadcast';
 import { log, withLogContext } from '$lib/server/log';
 import type { RequestHandler } from './$types';
 
@@ -50,6 +51,10 @@ export const POST: RequestHandler = async ({ params, url, locals }) => {
       { status: 409 }
     );
   }
+
+  // Push в /ws/u: владельцу на других вкладках сразу видно «Истёк».
+  // Финальный 'sent'/'failed' прилетит из processExpired ниже.
+  notifyUserSurveyStatus(claimed.userId, claimed.code, 'expired');
 
   // Запускаем обработку в фоне. Ошибки логируем — статус будет 'failed',
   // дашборд автоматически предложит retry.
