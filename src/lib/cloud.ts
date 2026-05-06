@@ -138,13 +138,20 @@ export function colorPicker(
  * Шкалирование размера шрифта по count. Логарифмическое — плотные «хвосты»
  * не «съедают» центр (если max=1000, а большинство слов с count<10).
  *
- * Возвращает baseSize..baseSize×4: даёт явное визуальное превосходство
- * самого популярного слова без того, чтобы оно вылезало за холст.
+ * Возвращает baseSize..baseSize×SIZE_MULTIPLIER: даёт явное визуальное
+ * превосходство самого популярного слова без того, чтобы оно вылезало
+ * за холст. SIZE_MULTIPLIER подобран опытным путём на 1200×800 layout.
+ *
+ * Ключевая константа также продублирована в `workers/render-worker.mjs`
+ * — должны совпадать по смыслу, иначе сайт и письмо разойдутся по
+ * относительным пропорциям шрифтов.
  */
+export const SIZE_MULTIPLIER = 5.5;
+
 export function weightFactor(words: CloudWord[], baseSize: number) {
   const max = Math.max(1, ...words.map((w) => w[1]));
   const denom = Math.log2(max + 1);
-  return (count: number) => baseSize * (1 + (Math.log2(count + 1) / denom) * 3);
+  return (count: number) => baseSize * (1 + (Math.log2(count + 1) / denom) * (SIZE_MULTIPLIER - 1));
 }
 
 /**

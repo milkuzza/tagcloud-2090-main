@@ -6,7 +6,7 @@ import { renderPng } from '../cloud/render-png';
 import { buildSurveyCsv } from '../export/csv';
 import { sendResultsEmail, type EmailAttachment } from '../email/send';
 import { getLogoPng } from '../email/logo';
-import { notifyClosed } from '../realtime/broadcast';
+import { notifyClosed, notifyUserSurveyStatus } from '../realtime/broadcast';
 import { redis } from '../redis';
 import { log } from '../log';
 
@@ -97,6 +97,7 @@ export async function processExpired(survey: Survey): Promise<void> {
     await db.update(surveys).set({ status: 'sent' }).where(eq(surveys.id, survey.id));
     await cleanupCloudKeys(questionIds);
     notifyClosed(survey.code, 'sent');
+    notifyUserSurveyStatus(survey.userId, survey.code, 'sent');
     log.info('expiry_sent', { surveyCode: survey.code });
   } catch (err) {
     log.error('expiry_failed', {
@@ -109,5 +110,6 @@ export async function processExpired(survey: Survey): Promise<void> {
     // более не нужны.
     await cleanupCloudKeys(questionIds);
     notifyClosed(survey.code, 'failed');
+    notifyUserSurveyStatus(survey.userId, survey.code, 'failed');
   }
 }

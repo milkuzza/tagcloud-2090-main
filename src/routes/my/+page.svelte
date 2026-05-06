@@ -5,37 +5,91 @@
   let { data }: PageProps = $props();
 
   /**
-   * Фоновое обновление списка, пока есть опросы в нетерминальных
-   * статусах (active/expired). Без этого пользователь, оставивший
-   * вкладку открытой, видел «Истёк» бесконечно — даже после того, как
-   * email уже отправился и реальный статус стал 'sent'/'failed'.
-   *
-   * 30 секунд — компромисс: чаще не нужно (опрос обычно живёт минуты-
-   * часы), реже — пользователь успевает забыть и закрыть вкладку. На
-   * /my у нас нет WS, поэтому добавлять отдельную инфраструктуру под
-   * один кейс — оверкилл; короткий debounced poll достаточно.
+   * Обновление статусов:
+   *  - WS `/ws/u`: per-user push-канал. Сервер пушит `survey-status`,
+   *    как только статус опроса фактически меняется (cron, /finish,
+   *    /retry). Это даёт «мгновенное» обновление UI — раньше
+   *    пользователь видел «Истёк» до 90с, пока не поллингу не
+   *    приходила свежая выборка.
+   *  - Фоновый poll (180с): запасной канал на случай, если WS
+   *    разорвался (мобильный, прокси, и т.п.). Реже, чем раньше —
+   *    основная нагрузка снята с polling'а на push.
    */
-  const POLL_MS = 30_000;
+  const POLL_MS = 180_000;
+  const WS_PATH = '/ws/u';
+  const WS_RECONNECT_MS = 3_000;
   let pollHandle: ReturnType<typeof setInterval> | null = null;
+  let ws: WebSocket | null = null;
+  let wsRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  let pageDestroyed = false;
 
   function hasNonTerminal(): boolean {
     return data.surveys.some((s) => s.status === 'active' || s.status === 'expired');
   }
 
-  onMount(() => {
-    if (!hasNonTerminal()) return;
-    pollHandle = setInterval(() => {
-      if (!hasNonTerminal()) {
-        if (pollHandle) clearInterval(pollHandle);
-        pollHandle = null;
-        return;
+  function openWs() {
+    if (typeof window === 'undefined') return;
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    try {
+      ws = new WebSocket(`${proto}//${location.host}${WS_PATH}`);
+    } catch {
+      ws = null;
+      scheduleReconnect();
+      return;
+    }
+    ws.addEventListener('message', (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg && msg.type === 'survey-status') {
+          // Без диффа в локальной модели — invalidateAll() вытащит
+          // полный список (там же questionsCount/responsesCount,
+          // которые тоже могли сменится).
+          void invalidateAll();
+        }
+      } catch {
+        /* ignore */
       }
+    });
+    ws.addEventListener('close', () => {
+      ws = null;
+      if (!pageDestroyed) scheduleReconnect();
+    });
+    ws.addEventListener('error', () => {
+      try {
+        ws?.close();
+      } catch {
+        /* ignore */
+      }
+    });
+  }
+
+  function scheduleReconnect() {
+    if (pageDestroyed) return;
+    if (wsRetryTimer) return;
+    wsRetryTimer = setTimeout(() => {
+      wsRetryTimer = null;
+      openWs();
+    }, WS_RECONNECT_MS);
+  }
+
+  onMount(() => {
+    openWs();
+    pollHandle = setInterval(() => {
+      if (!hasNonTerminal()) return;
       void invalidateAll();
     }, POLL_MS);
   });
 
   onDestroy(() => {
+    pageDestroyed = true;
     if (pollHandle) clearInterval(pollHandle);
+    if (wsRetryTimer) clearTimeout(wsRetryTimer);
+    try {
+      ws?.close();
+    } catch {
+      /* ignore */
+    }
   });
 
   function fmtDate(d: Date | string): string {

@@ -97,10 +97,15 @@ function colorPicker(scheme, palette, words) {
   return () => BRAND_NAVY;
 }
 
+// Совпадает с константой `SIZE_MULTIPLIER` в src/lib/cloud.ts. При
+// расхождении сайт и письмо нарисуют разные пропорции шрифтов.
+const SIZE_MULTIPLIER = 5.5;
+
 function weightFactor(words, baseSize) {
   const max = Math.max(1, ...words.map((w) => w[1]));
   const denom = Math.log2(max + 1);
-  return (count) => baseSize * (1 + (Math.log2(count + 1) / denom) * 3);
+  return (count) =>
+    baseSize * (1 + (Math.log2(count + 1) / denom) * (SIZE_MULTIPLIER - 1));
 }
 
 function fontWeightFor(words) {
@@ -182,7 +187,10 @@ export default async function render(job) {
           weight: weights(count)
         }))
       )
-      .padding(3)
+      // Padding=8: совпадает с клиентом (`src/lib/cloud-render.ts`),
+      // даёт визуальный воздух между словами и снижает шанс
+      // наложения для повёрнутых спрайтов.
+      .padding(8)
       .random(rng)
       // Если опрос разрешает вертикали — ~40% слов ставятся под ±90°
       // (равновероятно влево/вправо), остальные — горизонтально.
