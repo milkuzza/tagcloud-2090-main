@@ -31,15 +31,33 @@ if (!dbUrl) {
 }
 const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
-const [code, posArg, jsonArg] = process.argv.slice(2);
-if (!code || !jsonArg) {
-  console.error(
-    'usage: tsx scripts/seed-responses.ts <CODE> [<questionPosition>] \'{"слово":N,...}\''
-  );
+// Деструктуризация `[code, posArg, jsonArg]` сделала бы средний аргумент
+// фактически обязательным: при двух аргументах JSON попадал бы в `posArg`,
+// а `jsonArg` оставался undefined. Поэтому различаем длину argv явно.
+const argv = process.argv.slice(2);
+const usage =
+  'usage: tsx scripts/seed-responses.ts <CODE> [<questionPosition>] \'{"слово":N,...}\'';
+let code: string;
+let posArg: string | undefined;
+let jsonArg: string;
+if (argv.length === 2) {
+  [code, jsonArg] = argv;
+} else if (argv.length === 3) {
+  [code, posArg, jsonArg] = argv;
+} else {
+  console.error(usage);
   process.exit(1);
 }
-const questionPosition = posArg ? Number(posArg) : 0;
-if (!Number.isFinite(questionPosition) || questionPosition < 0) {
+if (!code || !jsonArg) {
+  console.error(usage);
+  process.exit(1);
+}
+const questionPosition = posArg !== undefined ? Number(posArg) : 0;
+if (
+  !Number.isFinite(questionPosition) ||
+  questionPosition < 0 ||
+  !Number.isInteger(questionPosition)
+) {
   console.error(`bad question position: ${posArg}`);
   process.exit(1);
 }
